@@ -16,31 +16,33 @@ function BentoHero() {
       {/* Tall scrollable page — the lid animation plays over the first 300vh */}
       <div ref={scrollContainerRef} style={{ width: '100%', minHeight: '300vh', backgroundColor: '#F15A24', position: 'relative', overflowX: 'hidden' }}>
 
-        {/* Fixed Canvas — right half only */}
-        <div style={{ position: 'fixed', top: 0, right: 0, width: '50%', height: '100vh', zIndex: 0 }}>
+        {/* Fixed Canvas — right 40% only */}
+        <div style={{ position: 'fixed', top: 0, right: 0, width: '40%', height: '100vh', zIndex: 0 }}>
           <Canvas
             shadows
-            camera={{ position: [0, 3.5, 8], fov: 36 }}
+            camera={{ position: [0, 5.5, 4.5], fov: 36 }}
             dpr={[1, 2]}
             gl={{ antialias: true }}
           >
             <Suspense fallback={null}>
-              {/* Strong key light from upper-left — gives the lid its signature dark sheen */}
-              <directionalLight position={[-3, 6, 5]} intensity={2.5} castShadow />
-              {/* Subtle warm fill from right */}
-              <directionalLight position={[4, 2, 2]} intensity={0.4} color="#ffe4cc" />
-              {/* Low ambient so shadows stay visible */}
-              <ambientLight intensity={0.25} />
+              {/* Moderate key light from upper-left */}
+              <directionalLight position={[-5, 8, 5]} intensity={1.5} castShadow />
+              {/* Subtle fill from right bottom */}
+              <directionalLight position={[4, 1, 3]} intensity={0.2} color="#ff8c55" />
+              {/* Very low ambient */}
+              <ambientLight intensity={0.06} />
               <Environment preset="studio" />
-              <BentoModel position={[0, -1, 0]} scale={1.6} />
-              <ContactShadows
-                position={[0, -2.2, 0]}
-                opacity={0.35}
-                scale={8}
-                blur={2}
-                far={4}
-                color="#000"
-              />
+              <group position={[-0.8, -0.2, 0]}>
+                <BentoModel position={[0, 0, 0]} scale={0.55} />
+                <ContactShadows
+                  position={[0, 0, 0]}
+                  opacity={0.55}
+                  scale={5}
+                  blur={2.5}
+                  far={2}
+                  color="#000"
+                />
+              </group>
             </Suspense>
           </Canvas>
         </div>
@@ -53,13 +55,13 @@ function BentoHero() {
             <Header />
           </div>
 
-          {/* Left column text */}
+          {/* Left column text — 60% width */}
           <div style={{ display: 'flex', height: '100%', width: '100%' }}>
-            <div style={{ width: '50%', height: '100%', pointerEvents: 'auto' }}>
+            <div style={{ width: '60%', height: '100%', pointerEvents: 'auto' }}>
               <HeroText />
             </div>
-            {/* Right half transparent — canvas shows through */}
-            <div style={{ width: '50%' }} />
+            {/* Right 40% transparent — canvas shows through */}
+            <div style={{ width: '40%' }} />
           </div>
 
           {/* "Scroll to open" cue */}
