@@ -1,19 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bento-bg: #EB5E28;
+  --color-bento-bg: #F15A24;
   --color-bento-tray: #8B2313;
   --color-bento-lid: #252422;
-  --color-bento-text: #252422;
+  --color-bento-text: #1a1a1a;
   --color-bento-cream: #FFFCF2;
   --color-bento-pickle: #84A962;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
 }
 
 body {
   background-color: var(--color-bento-bg);
   color: var(--color-bento-text);
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
-  margin: 0;
-  padding: 0;
 }
