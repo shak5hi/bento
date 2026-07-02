@@ -1,19 +1,24 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { useGLTF } from '@react-three/drei';
-import * as THREE from 'three';
 
 export function BentoModel(props: JSX.IntrinsicElements['group']) {
-  const { scene } = useGLTF('/models/bentocomponents.glb');
+  const { scene: trayScene } = useGLTF('/models/trey.glb');
+  const { scene: lidScene } = useGLTF('/models/lid.glb');
 
   return (
     <group {...props} dispose={null}>
-      {/* 
-        Blender uses Z-up, Three.js uses Y-up. 
-        If the model is lying on its side (lid not on top), we rotate it 90 degrees.
-      */}
-      <primitive object={scene} rotation={[Math.PI / 2, 0, 0]} />
+      <group rotation={[Math.PI / 2, 0, 0]}>
+        {/* Tray */}
+        <primitive object={trayScene} />
+        
+        {/* Lid (Needs to be in its own group with a ref for GSAP animation later) */}
+        <group name="bento-lid">
+          <primitive object={lidScene} />
+        </group>
+      </group>
     </group>
   );
 }
 
-useGLTF.preload('/models/bentocomponents.glb');
+useGLTF.preload('/models/trey.glb');
+useGLTF.preload('/models/lid.glb');
