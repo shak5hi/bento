@@ -88,6 +88,12 @@ body {
   gap: 4px;
 }
 
+.logo-img {
+  height: 36px;
+  width: auto;
+  display: block;
+}
+
 .heading {
   font-size: clamp(3.2rem, 6.2vw, 6.2rem);
   font-weight: 700;

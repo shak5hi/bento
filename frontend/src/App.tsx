@@ -4,6 +4,7 @@ import { AnimationController } from './experience/animations/AnimationController
 import { BentoModel } from './experience/models/BentoModel';
 import * as THREE from 'three';
 import logoSrc from './assets/logo.png';
+import './HeroLayout.css';
 
 function BentoHero() {
   return (
@@ -18,7 +19,7 @@ function BentoHero() {
         {/* ── Left column ────────────────────────────────── */}
         <div className="hero-left-col">
           <div className="logo">
-            BENT<span>🍱</span>
+            <img src={logoSrc} alt="Bento" className="logo-img" />
           </div>
 
           <h1 className="heading">
