@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useGLTF, useAnimations } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, createPortal } from '@react-three/fiber';
 import * as THREE from 'three';
 import { heroScroll } from '../scrollState';
+import { FoodItems } from './FoodItems';
 
 
 /**
@@ -51,6 +52,9 @@ export function BentoModel() {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
 
+      // Protect the food items from being painted with the tray material
+      if (mesh.name.toLowerCase().includes('food')) return;
+
       const isLid = mesh.name.toLowerCase().includes('lid') ||
                     child.parent?.name.toLowerCase().includes('lid');
 
@@ -77,10 +81,20 @@ export function BentoModel() {
       action.time = heroScroll.rawProgress * action.getClip().duration;
     }
   });
+  const treyNode = useMemo(() => {
+    let found = null;
+    scene.traverse((child) => {
+      if (child.name.toLowerCase().includes('trey') || child.name.toLowerCase().includes('tray')) {
+        found = child;
+      }
+    });
+    return found || scene;
+  }, [scene]);
 
   return (
     <group ref={group} position={[0, 0.8, 0]} rotation={[0, Math.PI / 6, 0]} scale={1.8}>
       <primitive object={scene} />
+      {treyNode && createPortal(<FoodItems />, treyNode)}
     </group>
   );
 }

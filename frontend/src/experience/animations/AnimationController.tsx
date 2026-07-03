@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { heroScroll } from '../scrollState';
