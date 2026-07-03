@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { AnimationController } from './experience/animations/AnimationController';
 import { BentoModel } from './experience/models/BentoModel';
 import * as THREE from 'three';
-import './HeroLayout.css';
+import logoSrc from './assets/logo.png';
 
 function BentoHero() {
   return (

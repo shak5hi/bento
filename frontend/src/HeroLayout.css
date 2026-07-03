@@ -39,7 +39,7 @@ body {
   /* stretch so both columns fill the full 100vh height */
   grid-template-columns: 52% 48%;
   align-items: stretch;
-  overflow: hidden;
+  /* no overflow:hidden — it clips CTA buttons */
 }
 
 /* ----------------------------------------------------------
@@ -80,7 +80,7 @@ body {
 .logo {
   font-size: 22px;
   font-weight: 800;
-  margin-bottom: 7vh;
+  margin-bottom: 3vh;
   letter-spacing: -0.05em;
   color: #111;
   display: flex;
@@ -101,7 +101,7 @@ body {
   font-size: 1.2rem;
   line-height: 1.65;
   color: #2a2a2a;
-  margin-bottom: 3rem;
+  margin-bottom: 1.5rem;
   max-width: 75%;
 }
 
