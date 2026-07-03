@@ -10,4 +10,6 @@ export const heroScroll = {
   /** Normalised scroll progress through the hero sequence: 0 (top) → 1 (end of pin). */
   rawProgress: 0,
   cameraProgress: 0,
+  zoomProgress: 0,
+  fadeProgress: 0,
 };

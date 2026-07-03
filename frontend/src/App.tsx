@@ -4,6 +4,7 @@ import { AnimationController } from './experience/animations/AnimationController
 import { BentoModel } from './experience/models/BentoModel';
 import * as THREE from 'three';
 import logoSrc from './assets/logo.png';
+import zoom2Img from './assets/compartmentzoom2.svg';
 import './HeroLayout.css';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -16,6 +17,9 @@ function BentoHero() {
   const leftColRef = useRef<HTMLDivElement>(null);
   const rightColRef = useRef<HTMLDivElement>(null);
   const scrollHintRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const zoom2Ref = useRef<HTMLImageElement>(null);
+  const zoomTextRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current || !leftColRef.current || !rightColRef.current) return;
@@ -32,8 +36,8 @@ function BentoHero() {
         }
       });
 
-      // 1. Map timeline to exactly 100 duration to match 0-100% scroll progress
-      tl.to({}, { duration: 100 });
+      // 1. Map timeline to exactly 200 duration to make room for zoom out
+      tl.to({}, { duration: 200 });
 
       // 2. SECTION 2A — TEXT EXITS (10% -> 20%)
       tl.to([leftColRef.current, scrollHintRef.current], {
@@ -82,6 +86,60 @@ function BentoHero() {
           heroScroll.rawProgress = proxy.progress;
         }
       }, 50);
+
+      // 5. SECTION 5 — PAUSE TO ADMIRE BOX (100% -> 110%)
+      
+      // 6. SECTION 6 — ZOOM INTO COMPARTMENT 2 (110% -> 140%)
+      const zoomState = { progress: 0 };
+      tl.to(zoomState, {
+        progress: 1,
+        ease: 'power3.inOut',
+        duration: 30,
+        onUpdate: () => {
+          heroScroll.zoomProgress = zoomState.progress;
+        }
+      }, 110);
+
+      // 7. SECTION 7 — FADE TO BENTO TRAY COLOR (135% -> 137%)
+      tl.to(overlayRef.current, {
+        opacity: 1,
+        ease: 'power4.in',
+        duration: 2
+      }, 135);
+
+      // 8. SECTION 8 — SUSHI IMAGE & TEXT SLIDE IN (137% -> 150%)
+      tl.to([zoom2Ref.current, zoomTextRef.current], {
+        opacity: 1,
+        y: 0,
+        ease: 'power3.out',
+        duration: 13
+      }, 137);
+
+      // 9. SECTION 9 — ZOOM OUT AND RESET (170% -> 200%)
+      // Hide UI
+      tl.to([zoom2Ref.current, zoomTextRef.current], {
+        opacity: 0,
+        y: 50,
+        ease: 'power3.in',
+        duration: 10
+      }, 170);
+
+      // Hide background overlay
+      tl.to(overlayRef.current, {
+        opacity: 0,
+        ease: 'power3.inOut',
+        duration: 15
+      }, 170);
+
+      // Reverse camera zoom to go back to Keyframe 4
+      tl.to(zoomState, {
+        progress: 0,
+        ease: 'power3.inOut',
+        duration: 30,
+        onUpdate: () => {
+          heroScroll.zoomProgress = zoomState.progress;
+        }
+      }, 170);
     });
 
     return () => ctx.revert();
@@ -136,7 +194,7 @@ function BentoHero() {
             }}
             className="hero-canvas"
           >
-            {/* Locks the camera to the approved framing — no OrbitControls */}
+            {/* The animation controller locks and moves the camera along the scroll path */}
             <AnimationController />
 
             <Suspense fallback={null}>
@@ -154,6 +212,82 @@ function BentoHero() {
 
       {/* Scroll hint — outside the grid so it doesn't become a 3rd grid child */}
       <div className="scroll-hint" ref={scrollHintRef}>Scroll to open</div>
+      
+      {/* Full screen fade overlay for entering the bento box */}
+      <div 
+        ref={overlayRef} 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: '#A13920', // Custom Bento tray terracotta color
+          opacity: 0,
+          pointerEvents: 'none',
+          zIndex: 0
+        }}
+      />
+      
+      {/* Zoom 2 Image Overlay (Sushi Detail) */}
+      <img
+        src={zoom2Img}
+        ref={zoom2Ref}
+        alt="Sushi Detail"
+        style={{
+          position: 'fixed',
+          top: '2vh',
+          right: '-18vw',
+          width: '65vw',
+          opacity: 0,
+          transform: 'translateY(100px)',
+          zIndex: 10, // Above the background, but can be under text if needed
+          pointerEvents: 'none'
+        }}
+      />
+
+      {/* Zoom 2 Text Overlay */}
+      <div
+        ref={zoomTextRef}
+        style={{
+          position: 'fixed',
+          top: '12vh',
+          left: '4vw',
+          width: '50vw',
+          opacity: 0,
+          transform: 'translateY(50px)',
+          zIndex: 10,
+          pointerEvents: 'none',
+          color: '#fff',
+          fontFamily: '"Arial Black", Impact, system-ui, -apple-system, sans-serif'
+        }}
+      >
+        <h2 style={{
+          fontSize: 'clamp(3.5rem, 5.5vw, 6.5rem)',
+          fontWeight: 900,
+          lineHeight: 0.85,
+          letterSpacing: '-0.04em',
+          textTransform: 'uppercase',
+          margin: 0,
+          marginBottom: '1.5rem',
+          color: '#fff',
+          whiteSpace: 'nowrap'
+        }}>
+          EVERY<br/>PROJECT<br/>STARTS<br/>WITH ONE PIECE.
+        </h2>
+        <p style={{
+          fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
+          fontSize: '1.25rem',
+          lineHeight: 1.5,
+          fontWeight: 400,
+          color: 'rgba(255, 255, 255, 0.9)',
+          maxWidth: '35ch',
+          letterSpacing: '0.01em',
+          whiteSpace: 'normal'
+        }}>
+          Create, improve, and watch your ideas come together into something complete.
+        </p>
+      </div>
     </div>
   );
 }
