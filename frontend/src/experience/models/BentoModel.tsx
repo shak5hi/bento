@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useGLTF, useAnimations } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -7,66 +7,82 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
+/**
+ * BentoModel — loads bento.glb and scrubs the Blender lid animation via scroll.
+ *
+ * Rules:
+ * - Do NOT modify geometry, materials, or GLB hierarchy.
+ * - Scale is always uniform (scalar, not array).
+ * - Animation scale tracks stripped to prevent non-uniform deformation.
+ * - Lid starts closed at frame 0. Animation plays only as the user scrolls.
+ */
 export function BentoModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF('/models/bento.glb');
-  const { actions, mixer, names } = useAnimations(animations, group);
-  
-  // Use a ref to store the scrub time so useFrame can read it without dependencies
+
+  // Memoised: strip scale tracks so the animation can never non-uniformly deform the model.
+  // Without useMemo this runs every render, causing useAnimations to re-bind on every frame.
+  const cleanedAnimations = useMemo(
+    () =>
+      animations.map((clip) => {
+        const clone = clip.clone();
+        clone.tracks = clone.tracks.filter((t) => !t.name.endsWith('.scale'));
+        return clone;
+      }),
+    [animations]
+  );
+
+  const { actions, mixer, names } = useAnimations(cleanedAnimations, group);
+
+  // GSAP writes scroll progress here; useFrame reads it every tick
   const scrub = useRef({ time: 0 });
 
+  // Use MeshStandardMaterial so lighting gives proper 3D depth.
+  // Colors: tray = #762C0B (deep terracotta), lid = #2d2d2d (charcoal).
   useEffect(() => {
+    const TRAY_MAT = new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#762C0B'),
+      roughness: 0.65,
+      metalness: 0.05,
+    });
+    const LID_MAT = new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#2d2d2d'),
+      roughness: 0.45,
+      metalness: 0.05,
+    });
+
     scene.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh || (child as THREE.SkinnedMesh).isSkinnedMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        child.frustumCulled = false;
-      }
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+
+      const isLid = mesh.name.toLowerCase().includes('lid') ||
+                    child.parent?.name.toLowerCase().includes('lid');
+
+      mesh.material = isLid ? LID_MAT : TRAY_MAT;
+      mesh.frustumCulled = false;
     });
   }, [scene]);
 
+  // Lid stays fully closed — animation disabled for now
   useEffect(() => {
-    if (names.length === 0) return;
+    if (!names.length) return;
     const action = actions[names[0]];
     if (!action) return;
 
     action.play();
-    action.paused = true; // Stop automatic time advancement
-    
-    // Force the mixer to evaluate frame 0 immediately so it doesn't vanish on mount
+    action.paused = true;
     mixer.setTime(0);
-    
-    const duration = action.getClip().duration;
-    
-    // Find a scrollable wrapper (if .hero-container is 100vh, the body must scroll)
-    // We will just bind it to the hero container, scrubbing as it scrolls out of view.
-    const scrollContainer = document.querySelector('.hero-container') || document.body;
-
-    const ctx = gsap.context(() => {
-      gsap.to(scrub.current, {
-        time: duration,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: scrollContainer,
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 1.5
-        }
-      });
-    });
-
-    return () => ctx.revert();
+    scrub.current.time = 0;
   }, [actions, names, mixer]);
 
+  // Every frame: apply the GSAP-driven time to the action
   useFrame(() => {
-    if (names.length > 0 && actions[names[0]]) {
-      // Continuously force the action to whatever time GSAP calculated
-      actions[names[0]].time = scrub.current.time;
-    }
+    const action = names.length ? actions[names[0]] : null;
+    if (action) action.time = scrub.current.time;
   });
 
   return (
-    <group ref={group} position={[2.3, -0.28, 0]} rotation={[0, -0.18, 0]} scale={0.82}>
+    <group ref={group} position={[0, 0.8, 0]} rotation={[0, Math.PI / 6, 0]} scale={1.8}>
       <primitive object={scene} />
     </group>
   );
