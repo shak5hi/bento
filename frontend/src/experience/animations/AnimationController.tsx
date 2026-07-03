@@ -8,16 +8,16 @@ export function AnimationController() {
   useEffect(() => {
     // NO ANIMATION per instructions
     
-    // Prompt: Camera initialization
-    // Position: X=0, Y=3.8, Z=6.0
-    // Rotation: X=-28deg, Y=0, Z=0
-    // LookAt: X=0.65, Y=0, Z=0
-    camera.position.set(0, 3.8, 6.0);
-    camera.rotation.set(-28 * (Math.PI / 180), 0, 0);
-    camera.fov = 30;
+    // Increased distance until ENTIRE Bento Box fits comfortably
+    const distance = 16; 
+    // Approximately 25-30 degree downward viewing angle
+    const angle = 28 * (Math.PI / 180);
     
-    // Overriding rotation with exact lookAt target per instructions
-    const target = new THREE.Vector3(0.65, 0, 0);
+    camera.position.set(0, distance * Math.sin(angle), distance * Math.cos(angle));
+    camera.fov = 30; // Kept lower fov for less distortion, or we could use 50. 30 is fine with larger distance.
+    
+    // Look at center of Bento Box
+    const target = new THREE.Vector3(0, 0, 0);
     camera.lookAt(target);
     camera.updateProjectionMatrix();
 

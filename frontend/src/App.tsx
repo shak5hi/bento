@@ -32,9 +32,25 @@ function BentoHero() {
             <SoftShadows size={15} samples={10} focus={0.5} />
             
             {/* Lighting exactly as specified */}
-            <pointLight position={[-2, 5, 3]} intensity={180} castShadow shadow-bias={-0.001} />
-            <pointLight position={[4, 2, 4]} intensity={40} />
-            <ambientLight intensity={0.45} />
+            <ambientLight intensity={0.5} />
+            <rectAreaLight
+              width={10}
+              height={10}
+              color="#ffffff"
+              intensity={4}
+              position={[5, 8, 5]}
+              rotation={[-Math.PI / 3, Math.PI / 8, 0]}
+            />
+            {/* Directional light to cast shadows (since AreaLight doesn't) */}
+            <directionalLight 
+              position={[5, 8, 5]} 
+              intensity={1.5} 
+              castShadow 
+              shadow-mapSize={[2048, 2048]} 
+              shadow-bias={-0.0001} 
+            />
+            {/* Soft fill light */}
+            <directionalLight position={[-4, 4, 2]} intensity={0.5} />
             
             <BentoModel />
           </Suspense>
