@@ -9,6 +9,9 @@ export function useLidAnimation(scrollContainer: React.RefObject<HTMLElement | n
   useEffect(() => {
     // Wait a tick for the R3F scene to mount and bounding-box math to run
     const timer = setTimeout(() => {
+      // TEMPORARILY DISABLED FOR MANUAL LEVA CALIBRATION
+      return;
+      
       const lid = lidRef.current;
       if (!lid || !scrollContainer.current) return;
 

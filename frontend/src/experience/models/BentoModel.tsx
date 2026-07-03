@@ -1,66 +1,52 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
-import { lidRef } from '../refs/bentoRefs';
 import * as THREE from 'three';
+import { lidRef } from '../refs/bentoRefs';
 
-interface BentoModelProps {
-  position?: [number, number, number];
-  scale?: number;
-}
-
-export function BentoModel({ position = [0, 0, 0], scale = 1 }: BentoModelProps) {
+export function BentoModel() {
   const { scene: trayScene } = useGLTF('/models/trey.glb');
   const { scene: lidScene } = useGLTF('/models/lid.glb');
-  
-  const outerRef = useRef<THREE.Group>(null);
-  const trayRef = useRef<THREE.Group>(null);
-  const aligned = useRef(false);
 
   useEffect(() => {
-    if (aligned.current) return;
-    const outer = outerRef.current;
-    const tray = trayRef.current;
-    const lid = lidRef.current;
-    if (!outer || !tray || !lid) return;
+    // Apply specified materials
+    trayScene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        material.color = new THREE.Color('#8B1C1C'); // Dark lacquer red
+        material.roughness = 0.42;
+        material.metalness = 0.05;
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
 
-    // Force world-matrix computation
-    outer.updateWorldMatrix(true, true);
-
-    const trayBox = new THREE.Box3().setFromObject(tray);
-    const lidBox = new THREE.Box3().setFromObject(lid);
-
-    // 1. Ground the tray: shift outer group so tray bottom is at Y=0
-    const groundOffset = -trayBox.min.y;
-    outer.position.y += groundOffset;
-
-    // 2. Recompute after grounding
-    outer.updateWorldMatrix(true, true);
-    const trayBoxGrounded = new THREE.Box3().setFromObject(tray);
-    const lidBoxGrounded = new THREE.Box3().setFromObject(lid);
-
-    // 3. Place lid so its bottom sits on the tray top rim
-    const lidOffset = trayBoxGrounded.max.y - lidBoxGrounded.min.y;
-    lid.position.y += lidOffset;
-
-    aligned.current = true;
+    lidScene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        material.color = new THREE.Color('#222222'); // Matte charcoal black
+        material.roughness = 0.72;
+        material.metalness = 0;
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
   }, [trayScene, lidScene]);
 
+  // Prompt: Rotation Y = -8 degrees
+  const rotY = -8 * (Math.PI / 180);
+
   return (
-    <group ref={outerRef} position={position} scale={scale}>
-      {/* 
-        Setting rotation to 0 so the box faces perfectly straight.
-        The reference image shows it straight-on (parallel), not diagonal.
-      */}
-      <group rotation={[0, 0, 0]}>
-        {/* Tray */}
-        <group ref={trayRef}>
-          <primitive object={trayScene} />
-        </group>
-        
-        {/* Lid - Bring it back, flip it so the black exterior faces up, and place it perfectly on top */}
-        <group ref={lidRef} name="bento-lid" rotation={[Math.PI, 0, 0]}>
-          <primitive object={lidScene} />
-        </group>
+    <group>
+      {/* Tray (Fixed) */}
+      {/* Prompt: Position X=0.65, Y=-0.18, Z=0 */}
+      <group position={[0.65, -0.18, 0]} rotation={[0, rotY, 0]}>
+        <primitive object={trayScene} />
+      </group>
+
+      {/* Lid (Animated via lidRef) */}
+      {/* Prompt: Position X=0.65, Y=0.06, Z=0 */}
+      <group ref={lidRef} position={[0.65, 0.06, 0]} rotation={[0, rotY, 0]}>
+        <primitive object={lidScene} />
       </group>
     </group>
   );
