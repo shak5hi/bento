@@ -1,79 +1,75 @@
-import React, { useEffect, useMemo } from 'react';
-import { useGLTF } from '@react-three/drei';
+import { useEffect, useRef } from 'react';
+import { useGLTF, useAnimations } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { lidRef } from '../refs/bentoRefs';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 
 export function BentoModel() {
-  const { scene: trayScene } = useGLTF('/models/trey.glb');
-  const { scene: lidScene } = useGLTF('/models/lid.glb');
-
-  // Compute bounding boxes to center models properly
-  useMemo(() => {
-    // Tray centering
-    const tBox = new THREE.Box3().setFromObject(trayScene);
-    const tCenter = tBox.getCenter(new THREE.Vector3());
-    const tSize = tBox.getSize(new THREE.Vector3());
-
-    // Center Tray X/Z
-    trayScene.position.x = -tCenter.x;
-    trayScene.position.z = -tCenter.z;
-    // Place Tray bottom at Y=0
-    trayScene.position.y = -tBox.min.y;
-
-    // Lid centering
-    const lBox = new THREE.Box3().setFromObject(lidScene);
-    const lCenter = lBox.getCenter(new THREE.Vector3());
-
-    // Center Lid X/Z
-    lidScene.position.x = -lCenter.x;
-    lidScene.position.z = -lCenter.z;
-    // Sit perfectly on top of the tray (Tray top is at tSize.y since bottom is at 0)
-    lidScene.position.y = -lBox.min.y + tSize.y;
-
-  }, [trayScene, lidScene]);
+  const group = useRef<THREE.Group>(null);
+  const { scene, animations } = useGLTF('/models/bento.glb');
+  const { actions, mixer, names } = useAnimations(animations, group);
+  
+  // Use a ref to store the scrub time so useFrame can read it without dependencies
+  const scrub = useRef({ time: 0 });
 
   useEffect(() => {
-    // Apply specified materials
-    trayScene.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        material.color = new THREE.Color('#8B1C1C'); // Dark lacquer red
-        material.roughness = 0.25; // Gentle glossy highlights
-        material.metalness = 0.1;
+    scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh || (child as THREE.SkinnedMesh).isSkinnedMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+        child.frustumCulled = false;
       }
     });
+  }, [scene]);
 
-    lidScene.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        material.color = new THREE.Color('#222222'); // Matte charcoal black
-        material.roughness = 0.85; // Matte
-        material.metalness = 0;
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
+  useEffect(() => {
+    if (names.length === 0) return;
+    const action = actions[names[0]];
+    if (!action) return;
+
+    action.play();
+    action.paused = true; // Stop automatic time advancement
+    
+    // Force the mixer to evaluate frame 0 immediately so it doesn't vanish on mount
+    mixer.setTime(0);
+    
+    const duration = action.getClip().duration;
+    
+    // Find a scrollable wrapper (if .hero-container is 100vh, the body must scroll)
+    // We will just bind it to the hero container, scrubbing as it scrolls out of view.
+    const scrollContainer = document.querySelector('.hero-container') || document.body;
+
+    const ctx = gsap.context(() => {
+      gsap.to(scrub.current, {
+        time: duration,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: scrollContainer,
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1.5
+        }
+      });
     });
-  }, [trayScene, lidScene]);
 
-  // Tiny Y rotation if necessary, but keep it almost straight
-  const rotY = -2 * (Math.PI / 180);
+    return () => ctx.revert();
+  }, [actions, names, mixer]);
+
+  useFrame(() => {
+    if (names.length > 0 && actions[names[0]]) {
+      // Continuously force the action to whatever time GSAP calculated
+      actions[names[0]].time = scrub.current.time;
+    }
+  });
 
   return (
-    <group rotation={[0, rotY, 0]}>
-      {/* Tray */}
-      <group>
-        <primitive object={trayScene} />
-      </group>
-
-      {/* Lid (Animated via lidRef but animations are disabled) */}
-      <group ref={lidRef}>
-        <primitive object={lidScene} />
-      </group>
+    <group ref={group} position={[2.3, -0.28, 0]} rotation={[0, -0.18, 0]} scale={0.82}>
+      <primitive object={scene} />
     </group>
   );
 }
 
-useGLTF.preload('/models/trey.glb');
-useGLTF.preload('/models/lid.glb');
+useGLTF.preload('/models/bento.glb');

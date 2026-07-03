@@ -1,8 +1,9 @@
 import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { SoftShadows } from '@react-three/drei';
+import { SoftShadows, Environment } from '@react-three/drei';
 import { AnimationController } from './experience/animations/AnimationController';
 import { BentoModel } from './experience/models/BentoModel';
+import * as THREE from 'three';
 import './HeroLayout.css';
 
 function BentoHero() {
@@ -25,32 +26,38 @@ function BentoHero() {
 
       {/* R3F Canvas - Right column only */}
       <div className="hero-right-col">
-        <Canvas shadows dpr={[1, 2]} gl={{ antialias: true }} className="hero-canvas">
+        <Canvas 
+          shadows 
+          dpr={[1, 2]} 
+          gl={{ 
+            antialias: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            outputColorSpace: THREE.SRGBColorSpace
+          }} 
+          className="hero-canvas"
+        >
           <AnimationController />
           
           <Suspense fallback={null}>
             <SoftShadows size={15} samples={10} focus={0.5} />
             
-            {/* Lighting exactly as specified */}
-            <ambientLight intensity={0.5} />
-            <rectAreaLight
-              width={10}
-              height={10}
-              color="#ffffff"
-              intensity={4}
-              position={[5, 8, 5]}
-              rotation={[-Math.PI / 3, Math.PI / 8, 0]}
-            />
-            {/* Directional light to cast shadows (since AreaLight doesn't) */}
+            {/* Soft, realistic studio lighting */}
+            <ambientLight intensity={0.55} />
+            
             <directionalLight 
-              position={[5, 8, 5]} 
-              intensity={1.5} 
+              position={[6, 8, 4]} 
+              intensity={2.2} 
               castShadow 
               shadow-mapSize={[2048, 2048]} 
               shadow-bias={-0.0001} 
             />
-            {/* Soft fill light */}
-            <directionalLight position={[-4, 4, 2]} intensity={0.5} />
+            
+            <directionalLight 
+              position={[-5, 2, -4]} 
+              intensity={0.35} 
+            />
+            
+            <Environment preset="city" />
             
             <BentoModel />
           </Suspense>

@@ -6,18 +6,11 @@ export function AnimationController() {
   const { camera } = useThree();
 
   useEffect(() => {
-    // NO ANIMATION per instructions
+    // Apple-style framing: Pulled back, fov 26, looking slightly downward
+    camera.position.set(0.8, 1.0, 6.2);
+    (camera as THREE.PerspectiveCamera).fov = 26;
     
-    // Increased distance until ENTIRE Bento Box fits comfortably
-    const distance = 16; 
-    // Approximately 25-30 degree downward viewing angle
-    const angle = 28 * (Math.PI / 180);
-    
-    camera.position.set(0, distance * Math.sin(angle), distance * Math.cos(angle));
-    camera.fov = 30; // Kept lower fov for less distortion, or we could use 50. 30 is fine with larger distance.
-    
-    // Look at center of Bento Box
-    const target = new THREE.Vector3(0, 0, 0);
+    const target = new THREE.Vector3(2.2, 0.2, 0);
     camera.lookAt(target);
     camera.updateProjectionMatrix();
 
