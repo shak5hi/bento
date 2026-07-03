@@ -12,7 +12,7 @@ body {
   background-color: #F15A24;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* ----------------------------------------------------------
@@ -22,7 +22,7 @@ body {
    ---------------------------------------------------------- */
 .hero-container {
   position: relative;
-  min-height: 200vh;
+  min-height: 800vh;
   width: 100%;
 }
 
@@ -46,23 +46,23 @@ body {
    Left column — typography
    ---------------------------------------------------------- */
 .hero-left-col {
+  padding-right: 4rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  /* align-self: center keeps text vertically centred without collapsing height */
-  align-self: center;
-  z-index: 10;
-  padding-right: 4vw;
+  position: relative;
+  z-index: 20; /* Ensure text and buttons stay above the massive canvas */
 }
 
-/* ----------------------------------------------------------
-   Right column — 3D canvas
-   ---------------------------------------------------------- */
+/* ── Right column — 3D Canvas ────────────────────── */
 .hero-right-col {
-  width: 100%;
+  width: 400%;
+  left: -150%;
   /* height is 100% of the grid row = 100vh because grid uses stretch */
   height: 100%;
   position: relative;
+  z-index: 1;
+  will-change: transform;
 }
 
 .hero-canvas {

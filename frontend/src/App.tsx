@@ -1,23 +1,103 @@
-import { Suspense } from 'react';
+import { useEffect, useRef, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
 import { AnimationController } from './experience/animations/AnimationController';
 import { BentoModel } from './experience/models/BentoModel';
 import * as THREE from 'three';
 import logoSrc from './assets/logo.png';
 import './HeroLayout.css';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { heroScroll } from './experience/scrollState';
+
+gsap.registerPlugin(ScrollTrigger);
 
 function BentoHero() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const leftColRef = useRef<HTMLDivElement>(null);
+  const rightColRef = useRef<HTMLDivElement>(null);
+  const scrollHintRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !leftColRef.current || !rightColRef.current) return;
+
+    // Use gsap.context to manage cleanup
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: containerRef.current,
+          start: 'top top',
+          end: 'bottom bottom',
+          scrub: 2.5, // Much higher scrub value for buttery smooth, heavy Apple-style movement
+          invalidateOnRefresh: true, // Recalculate function-based values on resize
+        }
+      });
+
+      // 1. Map timeline to exactly 100 duration to match 0-100% scroll progress
+      tl.to({}, { duration: 100 });
+
+      // 2. SECTION 2A — TEXT EXITS (10% -> 20%)
+      tl.to([leftColRef.current, scrollHintRef.current], {
+        xPercent: -80,
+        opacity: 0,
+        ease: 'power2.inOut',
+        duration: 10
+      }, 10);
+
+      // 2. SECTION 2B — CAMERA MOVES & BOX CENTERS (20% -> 48%) - Slow and smooth
+      const camProxy = { progress: 0 };
+      tl.to(camProxy, {
+        progress: 1,
+        ease: 'power3.inOut',
+        duration: 28,
+        onUpdate: () => {
+          heroScroll.cameraProgress = camProxy.progress;
+        }
+      }, 20);
+
+      // Simultaneously physically move the container to the center of the screen
+      tl.to(rightColRef.current, {
+        x: () => {
+          const parent = rightColRef.current!.parentElement;
+          if (!parent) return 0;
+          const style = window.getComputedStyle(parent);
+          const paddingLeft = parseFloat(style.paddingLeft) || 0;
+          const paddingRight = parseFloat(style.paddingRight) || 0;
+          const contentWidth = parent.getBoundingClientRect().width - paddingLeft - paddingRight;
+          return -0.26 * contentWidth;
+        },
+        ease: 'power3.inOut',
+        duration: 28
+      }, 20);
+
+      // 3. SECTION 3 — PAUSE (48% -> 50%)
+      // Nothing is scheduled here, the timeline naturally pauses
+
+      // 4. SECTION 4 — OPENING (50% -> 100%)
+      const proxy = { progress: 0 };
+      tl.to(proxy, {
+        progress: 1,
+        ease: 'none',
+        duration: 50,
+        onUpdate: () => {
+          heroScroll.rawProgress = proxy.progress;
+        }
+      }, 50);
+    });
+
+    return () => ctx.revert();
+  }, []);
+
   return (
     /**
-     * .hero-container is 200vh tall — this gives GSAP ScrollTrigger room to
-     * scrub the lid animation as the user scrolls. The visual content is
-     * sticky inside .hero-content (always 100vh tall).
+     * .hero-container height gives GSAP ScrollTrigger room to scrub.
+     * The visual content is sticky inside .hero-content.
      */
-    <div className="hero-container">
+    <div className="hero-container" ref={containerRef}>
       <div className="hero-content">
 
         {/* ── Left column ────────────────────────────────── */}
-        <div className="hero-left-col">
+        <div className="hero-left-col" ref={leftColRef}>
           <div className="logo">
             <img src={logoSrc} alt="Bento" className="logo-img" />
           </div>
@@ -41,7 +121,7 @@ function BentoHero() {
         </div>
 
         {/* ── Right column — 3D Canvas ────────────────────── */}
-        <div className="hero-right-col">
+        <div className="hero-right-col" ref={rightColRef}>
           <Canvas
             shadows
             /**
@@ -74,7 +154,7 @@ function BentoHero() {
       </div>{/* end .hero-content */}
 
       {/* Scroll hint — outside the grid so it doesn't become a 3rd grid child */}
-      <div className="scroll-hint">Scroll to open</div>
+      <div className="scroll-hint" ref={scrollHintRef}>Scroll to open</div>
     </div>
   );
 }

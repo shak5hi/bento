@@ -2,10 +2,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useGLTF, useAnimations } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { heroScroll } from '../scrollState';
 
-gsap.registerPlugin(ScrollTrigger);
 
 /**
  * BentoModel — loads bento.glb and scrubs the Blender lid animation via scroll.
@@ -34,9 +32,7 @@ export function BentoModel() {
 
   const { actions, mixer, names } = useAnimations(cleanedAnimations, group);
 
-  // GSAP writes scroll progress here; useFrame reads it every tick
-  const scrub = useRef({ time: 0 });
-
+  // We no longer need local ref for scrub, we read heroScroll directly in useFrame.
   // Use MeshStandardMaterial so lighting gives proper 3D depth.
   // Colors: tray = #762C0B (deep terracotta), lid = #2d2d2d (charcoal).
   useEffect(() => {
@@ -63,7 +59,7 @@ export function BentoModel() {
     });
   }, [scene]);
 
-  // Lid stays fully closed — animation disabled for now
+  // Connect Blender animation to our scroll state (0 -> 1 progress maps to 0 -> clip.duration)
   useEffect(() => {
     if (!names.length) return;
     const action = actions[names[0]];
@@ -72,13 +68,14 @@ export function BentoModel() {
     action.play();
     action.paused = true;
     mixer.setTime(0);
-    scrub.current.time = 0;
   }, [actions, names, mixer]);
 
-  // Every frame: apply the GSAP-driven time to the action
+  // Every frame: apply the shared scroll progress to the action time
   useFrame(() => {
     const action = names.length ? actions[names[0]] : null;
-    if (action) action.time = scrub.current.time;
+    if (action) {
+      action.time = heroScroll.rawProgress * action.getClip().duration;
+    }
   });
 
   return (
