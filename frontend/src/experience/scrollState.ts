@@ -11,5 +11,9 @@ export const heroScroll = {
   rawProgress: 0,
   cameraProgress: 0,
   zoomProgress: 0,
+  comp1ZoomProgress: 0,
+  comp3ZoomProgress: 0,
+  comp4ZoomProgress: 0,
+  comp5ZoomProgress: 0,
   fadeProgress: 0,
 };

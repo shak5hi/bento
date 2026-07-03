@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
-import { useControls } from 'leva';
 
 import comp1Svg from '../../assets/compartment1.svg';
 import comp2Svg from '../../assets/compartment2.svg';
@@ -97,9 +96,9 @@ const FOOD_CONFIGS: Record<string, { pos: [number, number, number]; rot: [number
     scale: [1.12, 1.34]
   },
   'Compartment 5': {
-    pos: [0, 0, 0],
-    rot: [-90, 0, -27],
-    scale: [1.22, 1.22]
+    pos: [0.01, 0.09, 0.16],
+    rot: [-84, 2, 22],
+    scale: [1.23, 1.44]
   }
 };
 
@@ -109,31 +108,10 @@ function FoodItemSVG({ svgUrl, name, targetBounds, count = 1, innerRef }: FoodIt
   texture.colorSpace = THREE.SRGBColorSpace;
   const visibleBounds = useVisibleBounds(texture.image as HTMLImageElement);
   
-  const isTarget = name === 'Compartment 5';
-  
-  const debugControls = useControls(`Adjust ${name}`, {
-    posX: { value: FOOD_CONFIGS[name]?.pos[0] ?? 0, step: 0.01 },
-    posY: { value: FOOD_CONFIGS[name]?.pos[1] ?? 0, step: 0.01 },
-    posZ: { value: FOOD_CONFIGS[name]?.pos[2] ?? 0, step: 0.01 },
-    rotX: { value: FOOD_CONFIGS[name]?.rot[0] ?? -90, step: 1 },
-    rotY: { value: FOOD_CONFIGS[name]?.rot[1] ?? 0, step: 1 },
-    rotZ: { value: FOOD_CONFIGS[name]?.rot[2] ?? 0, step: 1 },
-    scaleX: { value: FOOD_CONFIGS[name]?.scale[0] ?? 1, step: 0.01 },
-    scaleY: { value: FOOD_CONFIGS[name]?.scale[1] ?? 1, step: 0.01 },
-  }, { render: () => isTarget });
-  
   const transforms = useMemo(() => {
     if (!texture.image || !visibleBounds) return [];
     
-    let config = FOOD_CONFIGS[name] || { pos: [0,0,0], rot: [-90,0,0], scale: [1,1] };
-    
-    if (isTarget) {
-      config = {
-        pos: [debugControls.posX, debugControls.posY, debugControls.posZ],
-        rot: [debugControls.rotX, debugControls.rotY, debugControls.rotZ],
-        scale: [debugControls.scaleX, debugControls.scaleY]
-      };
-    }
+    const config = FOOD_CONFIGS[name] || { pos: [0,0,0], rot: [-90,0,0], scale: [1,1] };
     
     const img = texture.image as HTMLImageElement;
     const aspect = img.width / img.height;
@@ -231,7 +209,7 @@ function FoodItemSVG({ svgUrl, name, targetBounds, count = 1, innerRef }: FoodIt
     }
 
     return items;
-  }, [texture, targetBounds, count, visibleBounds, name, isTarget, debugControls]);
+  }, [texture, targetBounds, count, visibleBounds, name]);
 
   if (!texture.image || transforms.length === 0) return null;
 

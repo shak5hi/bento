@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useGLTF, useAnimations } from '@react-three/drei';
+import { useGLTF, useAnimations, useTexture } from '@react-three/drei';
 import { useFrame, createPortal } from '@react-three/fiber';
 import * as THREE from 'three';
 import { heroScroll } from '../scrollState';
 import { FoodItems } from './FoodItems';
+import logoSrc from '../../assets/lightlogo.png';
 
 
 /**
@@ -18,6 +19,7 @@ import { FoodItems } from './FoodItems';
 export function BentoModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF('/models/bento.glb');
+  const logoTexture = useTexture(logoSrc);
 
   // Memoised: strip scale tracks so the animation can never non-uniformly deform the model.
   // Without useMemo this runs every render, causing useAnimations to re-bind on every frame.
@@ -91,10 +93,32 @@ export function BentoModel() {
     return found || scene;
   }, [scene]);
 
+  const lidNode = useMemo(() => {
+    let found: THREE.Object3D | null = null;
+    scene.traverse((child) => {
+      if (child.name.toLowerCase().includes('lid')) {
+        found = child;
+      }
+    });
+    return found;
+  }, [scene]);
+
   return (
     <group ref={group} position={[0, 0.8, 0]} rotation={[0, Math.PI / 6, 0]} scale={1.8}>
       <primitive object={scene} />
       {treyNode && createPortal(<FoodItems />, treyNode)}
+      {lidNode && createPortal(
+        <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[2, 2]} />
+          <meshStandardMaterial 
+            map={logoTexture} 
+            transparent 
+            side={THREE.DoubleSide}
+            depthTest={false} 
+          />
+        </mesh>,
+        lidNode
+      )}
     </group>
   );
 }
