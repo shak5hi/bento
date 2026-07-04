@@ -23,6 +23,9 @@ function BentoHero() {
   const scrollHintRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   
+  const finalTextLeftRef = useRef<HTMLDivElement>(null);
+  const finalTextRightRef = useRef<HTMLDivElement>(null);
+  
   const zoom1Ref = useRef<HTMLImageElement>(null);
   const zoom1TextRef = useRef<HTMLDivElement>(null);
   const zoom2Ref = useRef<HTMLImageElement>(null);
@@ -48,7 +51,7 @@ function BentoHero() {
         }
       });
 
-      tl.to({}, { duration: 750 });
+      tl.to({}, { duration: 1200 });
 
       tl.to([leftColRef.current, scrollHintRef.current], {
         xPercent: -80, opacity: 0, ease: 'power2.inOut', duration: 10
@@ -124,12 +127,30 @@ function BentoHero() {
       tl.to(overlayRef.current, { opacity: 0, ease: 'power3.inOut', duration: 15 }, 570);
       tl.to(zs5, { p: 0, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp5ZoomProgress = zs5.p }, 570);
 
-      // --- CLOSE LID ---
+      // --- CLOSE LID AND SLIDE OUT ---
       const proxyClose = { progress: 1 };
       tl.to(proxyClose, {
-        progress: 0, ease: 'power2.inOut', duration: 50,
+        progress: 0, ease: 'power2.inOut', duration: 120, // Close completely
         onUpdate: () => { heroScroll.rawProgress = proxyClose.progress; }
       }, 610);
+
+      // --- TEXT APPEARS ---
+      tl.fromTo(finalTextLeftRef.current,
+        { x: -300, opacity: 0 },
+        { x: 0, opacity: 1, ease: 'power2.out', duration: 150 }, // Slowed down by tripling duration
+        730
+      );
+      tl.fromTo(finalTextRightRef.current,
+        { x: 300, opacity: 0 },
+        { x: 0, opacity: 1, ease: 'power2.out', duration: 150 }, // Slowed down
+        730
+      );
+
+      // --- WAIT A SPLIT SEC, THEN SLIDE OUT ---
+      tl.to(rightColRef.current, {
+        x: () => -1.5 * window.innerWidth, // Slide out left
+        ease: 'power2.inOut', duration: 120
+      }, 930); // Starts at 930 (730 + 150 text anim + 50 wait)
 
     });
 
@@ -144,6 +165,8 @@ function BentoHero() {
 
   const headingStyle = { fontSize: "clamp(3.5rem, 5.5vw, 6.5rem)", fontWeight: 900, lineHeight: 0.85, letterSpacing: "-0.04em", textTransform: "uppercase", margin: 0, marginBottom: "1.5rem", color: "#fff", whiteSpace: "nowrap" };
   const pStyle = { fontFamily: "\"Inter\", system-ui, -apple-system, sans-serif", fontSize: "1.25rem", lineHeight: 1.5, fontWeight: 400, color: "rgba(255, 255, 255, 0.9)", maxWidth: "45ch", letterSpacing: "0.01em", whiteSpace: "normal" };
+
+  const finalHeadingStyle = { fontSize: "clamp(3.5rem, 6vw, 8rem)", fontWeight: 700, lineHeight: 0.85, letterSpacing: "-0.02em", textTransform: "uppercase", margin: 0, color: "#fff", fontFamily: "Impact, \"Arial Black\", system-ui, -apple-system, sans-serif" };
 
   return (
     <div className="hero-container" ref={containerRef}>
@@ -207,6 +230,15 @@ function BentoHero() {
       <div ref={zoom5TextRef} style={rightLayoutText as any}>
         <h2 style={headingStyle as any}>EVERY<br/>SIGNAL TELLS<br/>A STORY.</h2>
         <p style={pStyle as any}>Bento brings them together into clear recommendations you can actually act on.</p>
+      </div>
+
+      {/* FINAL SEQUENCE TEXTS */}
+      <div ref={finalTextLeftRef} style={{ position: "fixed", top: "5px", left: "5px", width: "100vw", opacity: 0, zIndex: 10, pointerEvents: "none" }}>
+        <h2 style={finalHeadingStyle as any}>EVERYTHING YOU BUILD.</h2>
+      </div>
+
+      <div ref={finalTextRightRef} style={{ position: "fixed", bottom: "5px", right: "5px", width: "100vw", opacity: 0, zIndex: 10, pointerEvents: "none", textAlign: "right" }}>
+        <h2 style={finalHeadingStyle as any}>ONE ENGINEERING HOME.</h2>
       </div>
     </div>
   );

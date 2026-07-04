@@ -47,12 +47,12 @@ export function AnimationController() {
   const q7 = useMemo(() => new THREE.Quaternion().setFromEuler(e7), [e7]);
 
   // --- Keyframe 8 (Deep Zoom into Compartment 3) ---
-  const p8 = useMemo(() => new THREE.Vector3(-1.5, 2.14, -1.2), []);
+  const p8 = useMemo(() => new THREE.Vector3(-1.5, 2.14, -1.8), []);
   const e8 = useMemo(() => new THREE.Euler(-1.496, 0.042, 0.505), []);
   const q8 = useMemo(() => new THREE.Quaternion().setFromEuler(e8), [e8]);
 
   // --- Keyframe 9 (Deep Zoom into Compartment 5) ---
-  const p9 = useMemo(() => new THREE.Vector3(5.5, 2.14, -0.58), []);
+  const p9 = useMemo(() => new THREE.Vector3(4.0, 2.14, -0.7), []);
   const e9 = useMemo(() => new THREE.Euler(-1.496, 0.042, 0.505), []);
   const q9 = useMemo(() => new THREE.Quaternion().setFromEuler(e9), [e9]);
 
