@@ -9,14 +9,17 @@ import zoom2Img from './assets/compartmentzoom2.svg';
 import zoom3Img from './assets/Compartment3.svg';
 import zoom4Img from './assets/compartmentzoom4.svg';
 import zoom5Img from './assets/Compartment5.svg';
+import mockDashboardImg from './assets/mockdashboard.png';
 import './HeroLayout.css';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useNavigate } from 'react-router-dom';
 import { heroScroll } from './experience/scrollState';
 
 gsap.registerPlugin(ScrollTrigger);
 
 function BentoHero() {
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColRef = useRef<HTMLDivElement>(null);
   const rightColRef = useRef<HTMLDivElement>(null);
@@ -25,6 +28,7 @@ function BentoHero() {
   
   const finalTextLeftRef = useRef<HTMLDivElement>(null);
   const finalTextRightRef = useRef<HTMLDivElement>(null);
+  const mockDashboardRef = useRef<HTMLImageElement>(null);
   
   const zoom1Ref = useRef<HTMLImageElement>(null);
   const zoom1TextRef = useRef<HTMLDivElement>(null);
@@ -51,7 +55,7 @@ function BentoHero() {
         }
       });
 
-      tl.to({}, { duration: 1200 });
+      tl.to({}, { duration: 1400 });
 
       tl.to([leftColRef.current, scrollHintRef.current], {
         xPercent: -80, opacity: 0, ease: 'power2.inOut', duration: 10
@@ -150,7 +154,14 @@ function BentoHero() {
       tl.to(rightColRef.current, {
         x: () => -1.5 * window.innerWidth, // Slide out left
         ease: 'power2.inOut', duration: 120
-      }, 930); // Starts at 930 (730 + 150 text anim + 50 wait)
+      }, 930); // Starts at 930 (730 + 150 text anim + 50 wait), Ends at 1050
+
+      // --- MOCK DASHBOARD APPEARS ---
+      tl.fromTo(mockDashboardRef.current,
+        { xPercent: -50, yPercent: 150, opacity: 0 },
+        { yPercent: -50, opacity: 1, ease: 'power3.out', duration: 150 },
+        1150 // Wait 100 units after bento box is completely gone
+      );
 
     });
 
@@ -176,7 +187,7 @@ function BentoHero() {
           <h1 className="heading">Every project deserves<br />a place at<br />the table.</h1>
           <p className="paragraph">One beautiful place.<br />A workspace designed for clarity —<br />no clutter, just your best work.</p>
           <div className="cta-group">
-            <button className="btn-primary">Get Started</button>
+            <button className="btn-primary" onClick={() => navigate('/login')}>Get Started</button>
             <button className="btn-secondary">See how it works →</button>
           </div>
         </div>
@@ -240,8 +251,66 @@ function BentoHero() {
       <div ref={finalTextRightRef} style={{ position: "fixed", bottom: "5px", right: "5px", width: "100vw", opacity: 0, zIndex: 10, pointerEvents: "none", textAlign: "right" }}>
         <h2 style={finalHeadingStyle as any}>ONE ENGINEERING HOME.</h2>
       </div>
+
+      {/* MOCK DASHBOARD */}
+      <img ref={mockDashboardRef} src={mockDashboardImg} style={{ position: "fixed", top: "50%", left: "50%", width: "45vw", zIndex: 5, pointerEvents: "auto", borderRadius: "12px", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }} />
     </div>
   );
 }
 
-export default function App() { return <BentoHero />; }
+function Footer() {
+  return (
+    <footer style={{ backgroundColor: "#111", color: "#fff", padding: "100px 72px 40px", fontFamily: "\"Inter\", system-ui, -apple-system, sans-serif", zIndex: 20, position: "relative" }}>
+      <div style={{ maxWidth: "1600px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "60px" }}>
+        <div>
+          <h3 style={{ fontSize: "2rem", fontWeight: 900, margin: "0 0 20px 0", letterSpacing: "-0.04em", fontFamily: "Impact, \"Arial Black\", sans-serif", textTransform: "uppercase" }}>BENTO.</h3>
+          <p style={{ color: "#aaa", maxWidth: "320px", lineHeight: 1.6, fontSize: "1.1rem" }}>One engineering home.<br/>Stop guessing. Start growing.</p>
+        </div>
+        <div style={{ display: "flex", gap: "100px", flexWrap: "wrap" }}>
+          <div>
+            <h4 style={{ fontWeight: 600, margin: "0 0 24px 0", fontSize: "1.1rem" }}>Product</h4>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "16px", color: "#888", cursor: "pointer" }}>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Features</li>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Integrations</li>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Pricing</li>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Changelog</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style={{ fontWeight: 600, margin: "0 0 24px 0", fontSize: "1.1rem" }}>Company</h4>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "16px", color: "#888", cursor: "pointer" }}>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>About Us</li>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Careers</li>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Blog</li>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Contact</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style={{ fontWeight: 600, margin: "0 0 24px 0", fontSize: "1.1rem" }}>Legal</h4>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "16px", color: "#888", cursor: "pointer" }}>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Privacy Policy</li>
+              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Terms of Service</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div style={{ maxWidth: "1600px", margin: "100px auto 0", borderTop: "1px solid #333", paddingTop: "40px", display: "flex", justifyContent: "space-between", color: "#666", fontSize: "0.95rem" }}>
+        <span>© 2026 Bento Inc. All rights reserved.</span>
+        <div style={{ display: "flex", gap: "30px", cursor: "pointer" }}>
+          <span style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#666"}>Twitter</span>
+          <span style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#666"}>LinkedIn</span>
+          <span style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#666"}>GitHub</span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+export default function App() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <BentoHero />
+      <Footer />
+    </div>
+  );
+}
