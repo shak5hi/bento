@@ -1,23 +1,23 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './Login.css';
 
-// Import all compartment SVG assets for the collage
+// Import specific compartment SVG assets for the collage
 import zoom1Img from '../assets/compartmentzoom1.svg';
 import zoom2Img from '../assets/compartmentzoom2.svg';
-import zoom3Img from '../assets/Compartment3.svg';
 import zoom4Img from '../assets/compartmentzoom4.svg';
-import zoom5Img from '../assets/Compartment5.svg';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log(isLogin ? "Logging in..." : "Registering...", { email, password });
     // Authentication logic would go here
+    navigate('/dashboard');
   };
 
   return (
@@ -88,11 +88,9 @@ export default function Login() {
       {/* RIGHT SIDE: Orange Background + SVG Collage */}
       <div className="login-right">
         <div className="collage-container">
-          <img src={zoom3Img} className="collage-img img-center" alt="Bento Compartment" />
           <img src={zoom1Img} className="collage-img img-top-left" alt="Bento Compartment" />
           <img src={zoom2Img} className="collage-img img-top-right" alt="Bento Compartment" />
-          <img src={zoom4Img} className="collage-img img-bottom-left" alt="Bento Compartment" />
-          <img src={zoom5Img} className="collage-img img-bottom-right" alt="Bento Compartment" />
+          <img src={zoom4Img} className="collage-img img-bottom" alt="Bento Compartment" />
         </div>
       </div>
     </div>
