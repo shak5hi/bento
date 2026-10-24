@@ -1,110 +1,104 @@
-# Bento — Backend
+<div align="center">
 
-Bento is an engineering health platform. It connects to the tools you already use — GitHub, Vercel, Sentry, and more — watches every project you own, and tells you what actually deserves your attention today. Pickle, Bento's AI assistant, turns raw engineering data into plain-English priorities instead of another wall of dashboards.
+# 🍱 Bento
 
-This repository contains the backend service: integrations, the health scoring engine, the AI insight layer, the API, and the weekly report system.
+**An engineering health platform. Connect GitHub, Vercel and Sentry once, and Bento tells you what across your projects actually needs attention today.**
+
+[![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Three.js](https://img.shields.io/badge/Three.js-R3F-000000?style=flat-square&logo=threedotjs)](https://threejs.org)
+[![GSAP](https://img.shields.io/badge/GSAP-animation-88ce02?style=flat-square&logo=greensock&logoColor=black)](https://gsap.com)
+[![Node.js](https://img.shields.io/badge/Node.js-Express-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://expressjs.com)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ecf8e?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
+[![Claude](https://img.shields.io/badge/AI-Claude_Haiku-d97757?style=flat-square&logo=anthropic&logoColor=white)](https://www.anthropic.com)
+
+</div>
+
+---
+
+## The problem
+
+Developers who look after several projects end up switching between GitHub, Vercel,
+Sentry and dependency alerts, then working out for themselves what matters. Bento
+pulls all of that into one **0–100 health score per project**. Its AI assistant,
+**Pickle**, turns the raw signals into a short, plain-English priority list.
 
 ## How it works
 
-1. **Connect** — a user links their tools (GitHub, Vercel, Sentry, etc.) once.
-2. **Ingest** — scheduled jobs poll each tool's API and store raw data as snapshots.
-3. **Score** — a rules-based engine turns raw data into a 0–100 health score per category (security, testing, dependencies, deployment, performance).
-4. **Explain** — Pickle, the AI layer, reads the scored data and writes short, plain-English insights and suggested fixes.
-5. **Serve** — the API exposes portfolio health, per-project detail, today's top priorities, and score trends to the frontend.
-6. **Report** — every Monday, an automated email summarizes what changed, what's at risk, and what to focus on next.
-
-## Tech stack
-
-| Layer | Choice | Why |
-|---|---|---|
-| Runtime | Node.js + Express | Simple, well-documented, easy to deploy |
-| Database | Supabase (Postgres) | Free tier, built-in auth, generous limits for an MVP |
-| Scheduling | node-cron | Runs polling and reports without a separate worker service |
-| AI | Claude Haiku (Anthropic API) | Low-cost model, called on a schedule and cached, never per request |
-| Email | Resend | Free tier covers weekly reports comfortably |
-| Hosting | Railway / Render | Free or low-cost tiers, auto-deploys from GitHub |
-
-Designed to run on close to $0/month until real usage requires scaling up.
-
-## Project structure
-
 ```
-src/
-├── server.js                 Entry point
-├── integrations/             Connects to external tools and pulls raw data
-│   ├── github/
-│   ├── vercel/
-│   ├── sentry/
-│   └── shared/                Common helpers: saving snapshots, handling errors
-├── jobs/                      Scheduled polling and webhook handlers
-├── scoring/                   Turns raw data into 0–100 health scores
-│   └── rules/                 One scoring rule per category
-├── ai/                        Pickle: generates plain-English insights
-├── api/
-│   ├── routes/                Endpoints consumed by the frontend
-│   └── middleware/            Auth and request handling
-├── reports/                   Weekly report generation and email delivery
-├── db/                        Schema, migrations, and database client
-└── config/                    Environment variable loading
-
-tests/                         Unit and integration tests
+ GitHub ─┐                ┌────────────┐     ┌───────────────┐     ┌─────────────┐
+ Vercel ─┼─► Ingest jobs ─►│ snapshots  │ ──► │ Scoring engine│ ──► │   scores    │
+ Sentry ─┘   (node-cron,   └────────────┘     │ 5 rule sets   │     └──────┬──────┘
+             webhooks)                         └───────────────┘            │
+                                                                            ▼
+           React dashboard ◄── REST API ◄── Pickle (Claude Haiku, cached) ◄─┘
+                                       └──► Weekly email report (Resend)
 ```
 
-Every folder contains its own `README.md` describing what belongs there.
+1. **Connect.** Link your tools once (GitHub OAuth; Vercel and Sentry API keys).
+2. **Ingest.** Scheduled jobs and GitHub webhooks save raw data as timestamped snapshots.
+3. **Score.** A rules engine scores **security, testing, dependencies, deployment and performance**.
+4. **Explain.** Pickle writes the insights and suggested fixes. It runs on a schedule
+   and its results are cached, never generated per request, so AI costs stay near $0.
+5. **Report.** Every Monday an email summarises what changed and what's at risk.
+
+## Frontend
+
+The landing page is a **scroll-driven 3D bento box**. The lid lifts, the trays come
+apart and the food items settle into place as you scroll.
+
+- Models made in **Blender**, exported to glTF and compressed with `gltf-pipeline`
+- Rendered with **React Three Fiber + drei**; a custom `AnimationController` maps
+  scroll progress to camera position and per-model transforms
+- **GSAP** timelines and **Lenis** smooth scrolling, with shared scroll state in **Zustand**
+- Tailwind CSS v4, React Router 7, and login and dashboard pages
+
+## Repository layout
+
+```
+bento/
+├── frontend/          React 19 + Vite + TypeScript, 3D landing, login, dashboard
+│   ├── src/experience/   R3F models, animation controller, scroll state
+│   └── public/models/    Optimised .glb assets
+└── backend/           Express API, integrations, scoring, AI, reports
+    ├── src/integrations/ GitHub · Vercel · Sentry → snapshots
+    ├── src/scoring/      Engine + per-category rules
+    ├── src/ai/           Pickle prompt + insight generation
+    └── src/jobs/         Cron scheduler + webhooks
+```
+
+See [`backend/README.md`](backend/README.md) for the database schema and design rules.
 
 ## Getting started
 
-1. Clone the repository and install dependencies:
-   ```
-   npm install
-   ```
-2. Copy the environment template and fill in your keys:
-   ```
-   cp .env.example .env
-   ```
-3. Run the schema in `src/db/schema.sql` against your Supabase project.
-4. Start the development server:
-   ```
-   npm run dev
-   ```
+```bash
+git clone https://github.com/shak5hi/bento.git
+cd bento
 
-## Environment variables
+# Frontend
+cd frontend && npm install && npm run dev
 
-See `.env.example` for the full list. At minimum you'll need a Supabase URL and service key, a GitHub OAuth app, and an Anthropic API key for Pickle.
-
-## Database schema
-
-| Table | Purpose |
-|---|---|
-| `users` | Registered accounts |
-| `projects` | Projects a user has added to Bento |
-| `integrations` | Connected tools and their access tokens, per project |
-| `snapshots` | Raw data pulled from each integration, timestamped |
-| `scores` | Calculated health scores per category, timestamped |
-| `reports` | Generated weekly report content, per user |
-
-Full definitions live in `src/db/schema.sql`.
-
-## Ownership
-
-This project is built by two contributors with a clean split of responsibility. See `OWNERSHIP.md` for the current folder-level breakdown.
-
-| Area | Owner |
-|---|---|
-| Integrations & data ingestion | Shakshi |
-| Scoring engine, AI layer, API, reports | Lavanya |
-| Database schema & config | Shared |
+# Backend (new terminal)
+cd backend && cp .env.example .env   # Supabase, GitHub OAuth, Anthropic, Resend keys
+npm install && npm run dev
+```
 
 ## Roadmap
 
-- [x] Core integrations (GitHub, Vercel, Sentry)
+- [x] GitHub, Vercel and Sentry integrations
 - [x] Rules-based health scoring
-- [x] Pickle AI insights
-- [x] Weekly email reports
-- [ ] Additional integrations (Cloudflare, Docker, GitHub Actions)
-- [ ] Automated fixes: Pickle proposes pull requests for routine issues, always pending human approval
+- [x] Pickle AI insights and weekly email reports
+- [x] 3D landing experience
+- [ ] More integrations (Cloudflare, Docker, GitHub Actions)
+- [ ] Pickle opens pull requests for routine fixes (always waiting for human approval)
+
+## Team
+
+| | Area |
+|---|---|
+| **[Shakshi Sharma](https://github.com/shak5hi)** | Frontend: the 3D landing experience, Blender models, animation system, login and dashboard; integrations and ingestion (per [`OWNERSHIP.md`](backend/OWNERSHIP.md)) |
+| **[Lavanya Verma](https://github.com/lavanyaaax)** | Backend: scoring engine, AI layer, API, reports |
 
 ## License
 
-Proprietary — all rights reserved.
-
+Proprietary. All rights reserved.
