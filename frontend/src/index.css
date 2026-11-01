@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* Brand tokens — from the Bento product overview: warm paper, near-black ink, one orange. */
 @theme {
   --color-bento-bg: #F15A24;
   --color-bento-tray: #8B2313;
@@ -7,6 +8,36 @@
   --color-bento-text: #1a1a1a;
   --color-bento-cream: #FFFCF2;
   --color-bento-pickle: #84A962;
+}
+
+:root {
+  --paper: #fbfaf8;
+  --paper-2: #f4f1ec;
+  --surface: #ffffff;
+  --ink: #17130f;
+  --ink-2: #3a3733;
+  --ink-3: #55524c;
+  --muted: #8a8680;
+  --line: #ece9e3;
+  --line-2: #ddd9d1;
+  --accent: #c8621a;
+  --accent-ink: #a94f12;
+  --accent-soft: rgba(200, 98, 26, 0.09);
+  --brand: #f15a24;
+  --ok: #4a7a5c;
+  --warn: #a8701c;
+  --crit: #b8422f;
+  --ok-soft: rgba(74, 122, 92, 0.11);
+  --warn-soft: rgba(179, 120, 31, 0.12);
+  --crit-soft: rgba(184, 66, 47, 0.10);
+  --pickle-bg: #17130f;
+  --pickle-ink: #f4f1ec;
+  --pickle-label: #d99a5f;
+
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --radius: 10px;
+  color-scheme: light;
 }
 
 *, *::before, *::after {
@@ -20,7 +51,32 @@ html, body {
 }
 
 body {
-  background-color: var(--color-bento-bg);
-  color: var(--color-bento-text);
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(200, 98, 26, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

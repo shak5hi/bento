@@ -1,98 +1,131 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { ApiError, api, auth } from '../lib/api';
 import './Login.css';
 
-// Import specific compartment SVG assets for the collage
 import zoom1Img from '../assets/compartmentzoom1.svg';
 import zoom2Img from '../assets/compartmentzoom2.svg';
 import zoom4Img from '../assets/compartmentzoom4.svg';
 
+type Mode = 'login' | 'register';
+
 export default function Login() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<Mode>('login');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+  const isLogin = mode === 'login';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const switchMode = () => {
+    setMode(isLogin ? 'register' : 'login');
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(isLogin ? "Logging in..." : "Registering...", { email, password });
-    // Authentication logic would go here
-    navigate('/dashboard');
+    setError(null);
+    setBusy(true);
+    try {
+      const body = isLogin ? { email, password } : { email, password, name: name || undefined };
+      const res = await api<{ token: string }>(`/auth/${isLogin ? 'login' : 'register'}`, { method: 'POST', body });
+      auth.set(res.token);
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div className="login-container">
-      {/* LEFT SIDE: Auth Form */}
-      <div className="login-left">
-        <div className="login-form-wrapper">
-          <Link to="/" className="back-link">
-            ← Back to Home
+    <div className="auth">
+      <section className="auth-panel">
+        <header className="auth-top">
+          <Link to="/" className="auth-mark" aria-label="Bento home">
+            <span className="mark">B</span>
+            <span>Bento</span>
           </Link>
-          
-          <div className="login-header">
-            <h1 className="login-title">
-              {isLogin ? 'Welcome back.' : 'Create an account.'}
-            </h1>
-            <p className="login-subtitle">
-              {isLogin 
-                ? 'Sign in to access your engineering home.' 
-                : 'Join Bento and start building clarity into your workspace.'}
-            </p>
-          </div>
+          <Link to="/" className="auth-back">Back to site</Link>
+        </header>
 
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label htmlFor="email">Email address</label>
-              <input 
-                type="email" 
-                id="email" 
-                placeholder="you@company.com" 
+        <div className="auth-body">
+          <p className="eyebrow">{isLogin ? 'Sign in' : 'Create account'}</p>
+          <h1 className="auth-title">
+            {isLogin ? <>Welcome <b>back.</b></> : <>Your engineering <b>home.</b></>}
+          </h1>
+          <p className="auth-lede">
+            {isLogin
+              ? 'Pickle has been watching your projects while you were away.'
+              : 'Connect your projects once. Bento tells you what deserves your attention, every day.'}
+          </p>
+
+          <form className="auth-form" onSubmit={handleSubmit} noValidate={false}>
+            {!isLogin && (
+              <label className="field">
+                <span>Name</span>
+                <input type="text" autoComplete="name" placeholder="Ada Lovelace" value={name} onChange={(e) => setName(e.target.value)} />
+              </label>
+            )}
+            <label className="field">
+              <span>Email</span>
+              <input
+                type="email"
+                autoComplete="email"
+                placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-            </div>
-            
-            <div className="input-group">
-              <label htmlFor="password">Password</label>
-              <input 
-                type="password" 
-                id="password" 
-                placeholder="••••••••" 
+            </label>
+            <label className="field">
+              <span className="field-row">
+                Password
+                <button type="button" className="field-toggle" onClick={() => setShowPassword((v) => !v)}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+                placeholder={isLogin ? 'Your password' : 'At least 8 characters'}
+                minLength={isLogin ? undefined : 8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-            </div>
+            </label>
 
-            {isLogin && (
-              <div className="forgot-password">
-                <a href="#">Forgot your password?</a>
-              </div>
-            )}
+            {error && <p className="auth-error" role="alert">{error}</p>}
 
-            <button type="submit" className="submit-btn">
-              {isLogin ? 'Sign In' : 'Sign Up'}
+            <button type="submit" className="auth-submit" disabled={busy}>
+              {busy ? (isLogin ? 'Signing in…' : 'Creating account…') : isLogin ? 'Sign in' : 'Create account'}
             </button>
           </form>
 
-          <div className="auth-toggle">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <button onClick={() => setIsLogin(!isLogin)} className="toggle-btn">
-              {isLogin ? 'Sign up' : 'Sign in'}
-            </button>
-          </div>
+          <p className="auth-switch">
+            {isLogin ? 'New to Bento?' : 'Already have an account?'}{' '}
+            <button type="button" onClick={switchMode}>{isLogin ? 'Create an account' : 'Sign in'}</button>
+          </p>
         </div>
-      </div>
 
-      {/* RIGHT SIDE: Orange Background + SVG Collage */}
-      <div className="login-right">
-        <div className="collage-container">
-          <img src={zoom1Img} className="collage-img img-top-left" alt="Bento Compartment" />
-          <img src={zoom2Img} className="collage-img img-top-right" alt="Bento Compartment" />
-          <img src={zoom4Img} className="collage-img img-bottom" alt="Bento Compartment" />
+        <footer className="auth-foot">© {new Date().getFullYear()} Bento</footer>
+      </section>
+
+      <aside className="auth-art" aria-hidden="true">
+        <div className="auth-collage">
+          <img src={zoom1Img} className="collage-img c1" alt="" />
+          <img src={zoom2Img} className="collage-img c2" alt="" />
+          <img src={zoom4Img} className="collage-img c3" alt="" />
         </div>
-      </div>
+        <figure className="auth-quote">
+          <blockquote>“Open one place. Know exactly what to do next.”</blockquote>
+          <figcaption>Pickle, your engineering assistant</figcaption>
+        </figure>
+      </aside>
     </div>
   );
 }

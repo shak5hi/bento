@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+.git
+.vscode
+.idea
+*.log
+*.local
+# Blender source files are not used by the app
+src/utils/*.blend
+src/utils/*.blend1

@@ -7,6 +7,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 4000,
-    strictPort: false
-  }
+    strictPort: false,
+    // Same-origin API in development, like nginx does in production.
+    proxy: {
+      '/api': process.env.API_PROXY_TARGET ?? 'http://localhost:8081',
+    },
+  },
 })

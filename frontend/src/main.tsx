@@ -1,19 +1,25 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import './index.css'
-import App from './App.tsx'
-import Login from './pages/Login.tsx'
-import Dashboard from './pages/Dashboard.tsx'
+import { RequireAuth } from './components/RequireAuth.tsx'
+
+// Each page is its own chunk: the 3D landing (three.js) never loads on the dashboard.
+const App = lazy(() => import('./App.tsx'))
+const Login = lazy(() => import('./pages/Login.tsx'))
+const Dashboard = lazy(() => import('./pages/Dashboard.tsx'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-      </Routes>
+      <Suspense fallback={null}>
+        <Routes>
+          <Route path="/" element={<App />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   </StrictMode>,
 )

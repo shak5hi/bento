@@ -15,6 +15,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useNavigate } from 'react-router-dom';
 import { heroScroll } from './experience/scrollState';
+import { auth } from './lib/api';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -168,27 +169,19 @@ function BentoHero() {
     return () => ctx.revert();
   }, []);
 
-  const leftLayoutImg = { position: "fixed", top: "2vh", right: "-18vw", width: "65vw", opacity: 0, transform: "translateY(100px)", zIndex: 10, pointerEvents: "none" };
-  const leftLayoutText = { position: "fixed", top: "12vh", left: "4vw", width: "60vw", opacity: 0, transform: "translateY(50px)", zIndex: 10, pointerEvents: "none", color: "#fff", fontFamily: "\"Arial Black\", Impact, system-ui, -apple-system, sans-serif" };
-
-  const rightLayoutImg = { position: "fixed", top: "-5vh", left: "-15vw", width: "60vw", opacity: 0, transform: "translateY(100px)", zIndex: 10, pointerEvents: "none" };
-  const rightLayoutText = { position: "fixed", bottom: "12vh", right: "4vw", width: "60vw", opacity: 0, transform: "translateY(50px)", zIndex: 10, pointerEvents: "none", color: "#fff", fontFamily: "\"Arial Black\", Impact, system-ui, -apple-system, sans-serif", textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end" };
-
-  const headingStyle = { fontSize: "clamp(3.5rem, 5.5vw, 6.5rem)", fontWeight: 900, lineHeight: 0.85, letterSpacing: "-0.04em", textTransform: "uppercase", margin: 0, marginBottom: "1.5rem", color: "#fff", whiteSpace: "nowrap" };
-  const pStyle = { fontFamily: "\"Inter\", system-ui, -apple-system, sans-serif", fontSize: "1.25rem", lineHeight: 1.5, fontWeight: 400, color: "rgba(255, 255, 255, 0.9)", maxWidth: "45ch", letterSpacing: "0.01em", whiteSpace: "normal" };
-
-  const finalHeadingStyle = { fontSize: "clamp(3.5rem, 6vw, 8rem)", fontWeight: 700, lineHeight: 0.85, letterSpacing: "-0.02em", textTransform: "uppercase", margin: 0, color: "#fff", fontFamily: "Impact, \"Arial Black\", system-ui, -apple-system, sans-serif" };
+  const scrollToStory = () => window.scrollTo({ top: window.innerHeight * 1.6, behavior: 'smooth' });
+  const getStarted = () => navigate(auth.token ? '/dashboard' : '/login');
 
   return (
     <div className="hero-container" ref={containerRef}>
       <div className="hero-content">
         <div className="hero-left-col" ref={leftColRef}>
           <div className="logo"><img src={logoSrc} alt="Bento" className="logo-img" /></div>
-          <h1 className="heading">Every project deserves<br />a place at<br />the table.</h1>
-          <p className="paragraph">One beautiful place.<br />A workspace designed for clarity —<br />no clutter, just your best work.</p>
+          <h1 className="heading">Every project deserves a place at <b>the table.</b></h1>
+          <p className="paragraph">One calm place for everything you build. Bento watches every project you own and tells you what deserves your attention today.</p>
           <div className="cta-group">
-            <button className="btn-primary" onClick={() => navigate('/login')}>Get Started</button>
-            <button className="btn-secondary">See how it works →</button>
+            <button className="btn-primary" onClick={getStarted}>Get started</button>
+            <button className="btn-secondary" onClick={scrollToStory}>See how it works <span aria-hidden="true">↓</span></button>
           </div>
         </div>
 
@@ -206,101 +199,87 @@ function BentoHero() {
       </div>
 
       <div className="scroll-hint" ref={scrollHintRef}>Scroll to open</div>
-      <div ref={overlayRef} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "#A13920", opacity: 0, pointerEvents: "none", zIndex: 0 }} />
+      <div ref={overlayRef} className="story-overlay" />
 
       {/* COMPARTMENT 1 - Right Layout */}
-      <img src={zoom1Img} ref={zoom1Ref} style={rightLayoutImg as any} />
-      <div ref={zoom1TextRef} style={rightLayoutText as any}>
-        <h2 style={headingStyle as any}>EVERY<br/>BENTO NEEDS<br/>BALANCE.</h2>
-        <p style={pStyle as any}>Every engineering portfolio does too. Pickle quietly brings together signals from every project and turns them into calm, actionable guidance.</p>
+      <img src={zoom1Img} ref={zoom1Ref} className="story-img story-img-r" alt="" />
+      <div ref={zoom1TextRef} className="story-text story-text-r">
+        <p className="story-eyebrow">01 · Balance</p>
+        <h2 className="story-heading">Every bento needs <b>balance.</b></h2>
+        <p className="story-p">Every engineering portfolio does too. Pickle quietly brings together signals from every project and turns them into calm, actionable guidance.</p>
       </div>
 
       {/* COMPARTMENT 2 - Left Layout */}
-      <img src={zoom2Img} ref={zoom2Ref} style={leftLayoutImg as any} />
-      <div ref={zoomTextRef} style={leftLayoutText as any}>
-        <h2 style={headingStyle as any}>HEALTHY<br/>PROJECTS<br/>ARE BUILT<br/>DAILY.</h2>
-        <p style={pStyle as any}>Bento helps you make steady progress by focusing on the work that matters most.</p>
+      <img src={zoom2Img} ref={zoom2Ref} className="story-img story-img-l" alt="" />
+      <div ref={zoomTextRef} className="story-text story-text-l">
+        <p className="story-eyebrow">02 · Habit</p>
+        <h2 className="story-heading">Healthy projects are <b>built daily.</b></h2>
+        <p className="story-p">Bento helps you make steady progress by focusing on the work that matters most — three things today, not fifty alerts.</p>
       </div>
 
       {/* COMPARTMENT 3 - Right Layout */}
-      <img src={zoom3Img} ref={zoom3Ref} style={rightLayoutImg as any} />
-      <div ref={zoom3TextRef} style={rightLayoutText as any}>
-        <h2 style={headingStyle as any}>SEE<br/>BEYOND<br/>THE CODE.</h2>
-        <p style={pStyle as any}>Every project receives a living Engineering Health Score, giving you a complete picture of its quality, not just its activity.</p>
+      <img src={zoom3Img} ref={zoom3Ref} className="story-img story-img-r" alt="" />
+      <div ref={zoom3TextRef} className="story-text story-text-r">
+        <p className="story-eyebrow">03 · Health</p>
+        <h2 className="story-heading">See beyond <b>the code.</b></h2>
+        <p className="story-p">Every project receives a living Engineering Health Score: a picture of its quality, not just its activity.</p>
       </div>
 
       {/* COMPARTMENT 4 - Left Layout */}
-      <img src={zoom4Img} ref={zoom4Ref} style={leftLayoutImg as any} />
-      <div ref={zoom4TextRef} style={leftLayoutText as any}>
-        <h2 style={headingStyle as any}>BRING<br/>EVERYTHING<br/>TO THE<br/>TABLE.</h2>
-        <p style={pStyle as any}>Bento gathers every project into one place, giving you a complete view of your engineering world.</p>
+      <img src={zoom4Img} ref={zoom4Ref} className="story-img story-img-l" alt="" />
+      <div ref={zoom4TextRef} className="story-text story-text-l">
+        <p className="story-eyebrow">04 · Everything</p>
+        <h2 className="story-heading">Bring everything <b>to the table.</b></h2>
+        <p className="story-p">Bento gathers every project into one place, giving you a complete view of your engineering world.</p>
       </div>
 
       {/* COMPARTMENT 5 - Right Layout */}
-      <img src={zoom5Img} ref={zoom5Ref} style={rightLayoutImg as any} />
-      <div ref={zoom5TextRef} style={rightLayoutText as any}>
-        <h2 style={headingStyle as any}>EVERY<br/>SIGNAL TELLS<br/>A STORY.</h2>
-        <p style={pStyle as any}>Bento brings them together into clear recommendations you can actually act on.</p>
+      <img src={zoom5Img} ref={zoom5Ref} className="story-img story-img-r" alt="" />
+      <div ref={zoom5TextRef} className="story-text story-text-r">
+        <p className="story-eyebrow">05 · Signal</p>
+        <h2 className="story-heading">Every signal tells <b>a story.</b></h2>
+        <p className="story-p">Bento brings them together into clear recommendations you can actually act on.</p>
       </div>
 
       {/* FINAL SEQUENCE TEXTS */}
-      <div ref={finalTextLeftRef} style={{ position: "fixed", top: "5px", left: "5px", width: "100vw", opacity: 0, zIndex: 10, pointerEvents: "none" }}>
-        <h2 style={finalHeadingStyle as any}>EVERYTHING YOU BUILD.</h2>
+      <div ref={finalTextLeftRef} className="final-text final-text-l">
+        <h2 className="final-heading">Everything you build.</h2>
       </div>
-
-      <div ref={finalTextRightRef} style={{ position: "fixed", bottom: "5px", right: "5px", width: "100vw", opacity: 0, zIndex: 10, pointerEvents: "none", textAlign: "right" }}>
-        <h2 style={finalHeadingStyle as any}>ONE ENGINEERING HOME.</h2>
+      <div ref={finalTextRightRef} className="final-text final-text-r">
+        <h2 className="final-heading"><b>One engineering home.</b></h2>
       </div>
 
       {/* MOCK DASHBOARD */}
-      <img ref={mockDashboardRef} src={mockDashboardImg} style={{ position: "fixed", top: "50%", left: "50%", width: "45vw", zIndex: 5, pointerEvents: "auto", borderRadius: "12px", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }} />
+      <img ref={mockDashboardRef} src={mockDashboardImg} className="mock-dashboard" alt="The Bento dashboard" />
     </div>
   );
 }
 
 function Footer() {
+  const cols = [
+    { title: 'Product', links: ['How it works', 'Health score', 'Pickle', 'Changelog'] },
+    { title: 'Company', links: ['About', 'Careers', 'Blog', 'Contact'] },
+    { title: 'Legal', links: ['Privacy', 'Terms'] },
+  ];
   return (
-    <footer style={{ backgroundColor: "#111", color: "#fff", padding: "100px 72px 40px", fontFamily: "\"Inter\", system-ui, -apple-system, sans-serif", zIndex: 20, position: "relative" }}>
-      <div style={{ maxWidth: "1600px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "60px" }}>
+    <footer className="site-footer">
+      <div className="footer-top">
         <div>
-          <h3 style={{ fontSize: "2rem", fontWeight: 900, margin: "0 0 20px 0", letterSpacing: "-0.04em", fontFamily: "Impact, \"Arial Black\", sans-serif", textTransform: "uppercase" }}>BENTO.</h3>
-          <p style={{ color: "#aaa", maxWidth: "320px", lineHeight: 1.6, fontSize: "1.1rem" }}>One engineering home.<br/>Stop guessing. Start growing.</p>
+          <p className="footer-brand">Bento</p>
+          <p className="footer-tag">One engineering home.<br />Stop guessing. Start growing.</p>
         </div>
-        <div style={{ display: "flex", gap: "100px", flexWrap: "wrap" }}>
-          <div>
-            <h4 style={{ fontWeight: 600, margin: "0 0 24px 0", fontSize: "1.1rem" }}>Product</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "16px", color: "#888", cursor: "pointer" }}>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Features</li>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Integrations</li>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Pricing</li>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Changelog</li>
-            </ul>
-          </div>
-          <div>
-            <h4 style={{ fontWeight: 600, margin: "0 0 24px 0", fontSize: "1.1rem" }}>Company</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "16px", color: "#888", cursor: "pointer" }}>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>About Us</li>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Careers</li>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Blog</li>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Contact</li>
-            </ul>
-          </div>
-          <div>
-            <h4 style={{ fontWeight: 600, margin: "0 0 24px 0", fontSize: "1.1rem" }}>Legal</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "16px", color: "#888", cursor: "pointer" }}>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Privacy Policy</li>
-              <li style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#888"}>Terms of Service</li>
-            </ul>
-          </div>
-        </div>
+        <nav className="footer-cols" aria-label="Footer">
+          {cols.map((c) => (
+            <div key={c.title}>
+              <p className="footer-h">{c.title}</p>
+              <ul>{c.links.map((l) => <li key={l}><a href="#">{l}</a></li>)}</ul>
+            </div>
+          ))}
+        </nav>
       </div>
-      <div style={{ maxWidth: "1600px", margin: "100px auto 0", borderTop: "1px solid #333", paddingTop: "40px", display: "flex", justifyContent: "space-between", color: "#666", fontSize: "0.95rem" }}>
-        <span>© 2026 Bento Inc. All rights reserved.</span>
-        <div style={{ display: "flex", gap: "30px", cursor: "pointer" }}>
-          <span style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#666"}>Twitter</span>
-          <span style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#666"}>LinkedIn</span>
-          <span style={{ transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#fff"} onMouseLeave={(e) => e.currentTarget.style.color = "#666"}>GitHub</span>
-        </div>
+      <div className="footer-bottom">
+        <span>© {new Date().getFullYear()} Bento</span>
+        <span className="footer-social"><a href="#">X</a><a href="#">LinkedIn</a><a href="#">GitHub</a></span>
       </div>
     </footer>
   );
@@ -308,7 +287,7 @@ function Footer() {
 
 export default function App() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div className="landing">
       <BentoHero />
       <Footer />
     </div>

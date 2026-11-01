@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 
-import comp1Svg from '../../assets/compartment1.svg';
-import comp2Svg from '../../assets/compartment2.svg';
-import comp3Svg from '../../assets/compartment3.svg';
-import comp4Svg from '../../assets/compartment4.svg';
-import comp5Svg from '../../assets/compartment5.svg';
+import comp1Svg from '../../assets/Compartment1.svg';
+import comp2Svg from '../../assets/Compartment2.svg';
+import comp3Svg from '../../assets/Compartment3.svg';
+import comp4Svg from '../../assets/Compartment4.svg';
+import comp5Svg from '../../assets/Compartment5.svg';
 
 interface TargetBounds {
   minX: number;
