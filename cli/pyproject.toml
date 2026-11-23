@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bento-cli"
+version = "0.1.0"
+description = "Run Bento's repository health checks on a local folder or in CI."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+dependencies = ["httpx>=0.27,<1"]
+
+[project.scripts]
+bento = "bento_cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bento_cli"]
+
+# The checks are the scanner service's own code (backend/shared/bento_core/scanning), bundled into
+# the wheel so the CLI and the hosted scanner can never drift apart.
+[tool.hatch.build.targets.wheel.force-include]
+"../backend/shared/bento_core/scanning" = "bento_cli/scanning"

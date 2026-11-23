@@ -20,11 +20,8 @@ from bento_core.config import settings
 from bento_core.db import create_pool
 from bento_core.log import setup_logging
 from bento_core.net import repo_url_error
+from bento_core.scanning import list_files, run_checks
 
-from checks import hygiene, list_files, vulnerabilities
-from dockerfile import dockerfiles
-from outdated import outdated
-from secretscan import secrets_in_code
 
 log = setup_logging()
 
@@ -142,10 +139,8 @@ class Scanner:
             root = Path(workdir)
             if dir_size_mb(root) > MAX_REPO_MB:
                 raise ScanError(f"repository is larger than {MAX_REPO_MB} MB")
-            files = list_files(root)
-            # file reads are blocking: keep them off the event loop
-            local = await asyncio.to_thread(lambda: hygiene(files) + secrets_in_code(root, files) + dockerfiles(root, files))
-            found = local + await vulnerabilities(root, self.http) + await outdated(root, self.http, self.r)
+            # the same checks the `bento scan` CLI runs (bento_core.scanning)
+            found = await run_checks(root, list_files(root), self.http, cache=self.r)
         except ScanError as exc:
             await self.pg.execute(
                 "UPDATE scans SET status = 'failed', error = $3, finished_at = now() WHERE project_id = $1 AND sha = $2",

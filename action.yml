@@ -1,0 +1,50 @@
+name: Bento scan
+description: Run Bento's repository health checks (secrets, vulnerable and outdated dependencies, Dockerfiles, hygiene) and fail the build on serious findings.
+author: Bento
+branding:
+  icon: shield
+  color: orange
+
+inputs:
+  path:
+    description: Folder to scan, relative to the workspace.
+    default: "."
+  fail-on:
+    description: Fail the step if any finding is this severe or worse (critical, high, medium, low, never).
+    default: high
+  offline:
+    description: Skip the online lookups (OSV advisories, latest npm/PyPI versions).
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Install bento
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        # First interpreter that really runs and is 3.10+ (on Windows, python3 can be a Store placeholder).
+        PY=""
+        for c in python3 python; do
+          if "$c" -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null; then PY=$c; break; fi
+        done
+        if [ -z "$PY" ]; then echo "::error::bento needs Python 3.10+. Add actions/setup-python before this step."; exit 1; fi
+        # Own virtual environment: doesn't touch the Python your workflow uses.
+        "$PY" -m venv "$RUNNER_TEMP/bento-venv"
+        BIN="$RUNNER_TEMP/bento-venv/bin"; [ -d "$BIN" ] || BIN="$RUNNER_TEMP/bento-venv/Scripts"
+        "$BIN/python" -m pip install --quiet --disable-pip-version-check "$ACTION_PATH/cli"
+        echo "BENTO_BIN=$BIN/bento" >> "$GITHUB_ENV"
+
+    - name: Scan
+      shell: bash
+      env:
+        # inputs go through the environment, never pasted into the script
+        BENTO_PATH: ${{ inputs.path }}
+        BENTO_FAIL_ON: ${{ inputs.fail-on }}
+        BENTO_OFFLINE: ${{ inputs.offline }}
+      run: |
+        args=(scan "$BENTO_PATH" --fail-on "$BENTO_FAIL_ON")
+        [ "$BENTO_OFFLINE" = "true" ] && args+=(--offline)
+        "$BENTO_BIN" "${args[@]}"

@@ -10,7 +10,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from checks import ENV_OK, finding
+from .checks import ENV_OK, finding
 
 MAX_FILE_BYTES = 512 * 1024
 MAX_LINE_CHARS = 2_000  # longer lines are minified bundles or data blobs
