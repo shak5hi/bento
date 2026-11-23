@@ -179,7 +179,6 @@ async def get_project(project_id: UUID, user_id: UUID = Depends(current_user_id)
             {
                 "brief": advice["brief"],
                 "recommendations": advice["recommendations"],
-                "source": advice["source"],
                 "generatedAt": advice["generated_at"],
             }
             if advice

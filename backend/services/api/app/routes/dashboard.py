@@ -71,7 +71,7 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
         user_id,
     )
     advice = await state.pg.fetch(
-        """SELECT a.project_id, a.brief, a.recommendations, a.source, a.generated_at
+        """SELECT a.project_id, a.brief, a.recommendations, a.generated_at
              FROM advice a JOIN projects p ON p.id = a.project_id WHERE p.owner_id = $1""",
         user_id,
     )
@@ -167,7 +167,6 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
                 "projectId": str(a["project_id"]),
                 "brief": a["brief"],
                 "recommendations": a["recommendations"],
-                "source": a["source"],
                 "generatedAt": a["generated_at"],
             }
             for a in advice

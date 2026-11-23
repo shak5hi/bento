@@ -72,7 +72,6 @@ async def _collect() -> dict:
         except Exception:  # noqa: BLE001 - stream not created yet
             queues[stream] = {"waiting": 0, "unacked": 0}
 
-    circuit = await state.redis.get("advisor:circuit") or "closed"
     alerts = {
         "sent": int(await state.redis.get("stats:alerts_sent") or 0),
         "suppressed": int(await state.redis.get("stats:alerts_suppressed") or 0),
@@ -84,6 +83,5 @@ async def _collect() -> dict:
         "dependencies": deps,
         "workers": workers,
         "queues": queues,
-        "advisorCircuit": circuit,
         "alerts": alerts,
     }

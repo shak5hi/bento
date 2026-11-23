@@ -114,7 +114,7 @@ export interface Dashboard {
   biggestRisk: Task | null;
   today: Task[];
   projects: ProjectSummary[];
-  pickle: { projectId: string; brief: string; recommendations: Recommendation[]; source: 'ai' | 'rules'; generatedAt: string }[];
+  pickle: { projectId: string; brief: string; recommendations: Recommendation[]; generatedAt: string }[];
   activity: { kind: string; title: string; body: string | null; at: string; projectName: string | null }[];
 }
 
@@ -140,7 +140,7 @@ export interface ProjectDetail {
   }[];
   findings: { id: string; severity: Severity; title: string; detail: string | null; effortMinutes: number | null; firstSeen: string }[];
   incidents: { id: string; url: string; kind: 'latency' | 'errors'; status: 'open' | 'closed'; baseline: number | null; peak: number | null; openedAt: string; closedAt: string | null }[];
-  advice: { brief: string; recommendations: Recommendation[]; source: 'ai' | 'rules'; generatedAt: string } | null;
+  advice: { brief: string; recommendations: Recommendation[]; generatedAt: string } | null;
 }
 
 export interface LatencyPoint {
@@ -154,6 +154,5 @@ export interface SystemHealth {
   status: 'ok' | 'degraded';
   workers: Record<string, { instances: number; status: 'ok' | 'down' }>;
   queues: Record<string, { waiting: number; unacked: number }>;
-  advisorCircuit: string;
   alerts: { sent: number; suppressed: number };
 }

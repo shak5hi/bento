@@ -342,7 +342,7 @@ function SystemPanel({ system }: { system: SystemHealth | null }) {
       <p className="muted small">
         {jobs ? `${jobs.waiting} probe job${jobs.waiting === 1 ? '' : 's'} waiting · ` : ''}
         {system.alerts.sent} alert{system.alerts.sent === 1 ? '' : 's'} sent, {system.alerts.suppressed} duplicate
-        {system.alerts.suppressed === 1 ? '' : 's'} suppressed · advisor circuit {system.advisorCircuit}
+        {system.alerts.suppressed === 1 ? '' : 's'} suppressed
       </p>
     </section>
   );

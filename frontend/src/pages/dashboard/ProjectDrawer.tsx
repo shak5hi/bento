@@ -140,7 +140,7 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
 
             {data.advice && (
               <section className="pickle pickle-sm">
-                <p className="pickle-label">Pickle {data.advice.source === 'ai' ? '' : '· rule-based'}</p>
+                <p className="pickle-label">Pickle</p>
                 <p className="pickle-text">{data.advice.brief}</p>
                 {data.advice.recommendations.length > 0 && (
                   <ol className="recs">
