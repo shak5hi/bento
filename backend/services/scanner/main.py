@@ -122,7 +122,14 @@ class Scanner:
         stale = claim["prev_status"] == "running" and claim["prev_started"] is not None and (
             await self.pg.fetchval("SELECT $1 < now() - interval '10 minutes'", claim["prev_started"])
         )
-        if not (claim["inserted"] or claim["prev_status"] == "failed" or stale):
+        # "Scan now" always rescans: the checks may have changed even if the commit hasn't.
+        forced = bool(job.get("force")) and not claim["inserted"]
+        if forced:
+            await self.pg.execute(
+                "UPDATE scans SET status = 'running', started_at = now(), error = NULL WHERE project_id = $1 AND sha = $2",
+                project["id"], sha,
+            )
+        if not (claim["inserted"] or claim["prev_status"] == "failed" or stale or forced):
             log.info("skip %s@%s: already scanned (delivery %d)", name, sha[:7], claim["delivery_count"])
             return
 
