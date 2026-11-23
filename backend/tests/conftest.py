@@ -5,7 +5,6 @@ Redis; they always use separate `*_test` databases and Redis DB 15, derived from
 TIMESCALE_URL / REDIS_URL, so they can never touch real data.
 """
 
-import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -36,12 +35,3 @@ os.environ["REDIS_URL"] = _test_db(os.environ.get("REDIS_URL", "redis://localhos
 for p in (BACKEND / "shared", BACKEND / "services" / "api", BACKEND / "services" / "fixer", REPO / "cli"):
     sys.path.insert(0, str(p))
 
-
-def load_service(service: str, module: str = "main"):
-    """Import services/<service>/<module>.py under a unique name (every service has a main.py)."""
-    path = BACKEND / "services" / service / f"{module}.py"
-    spec = importlib.util.spec_from_file_location(f"{service}_{module}", path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod

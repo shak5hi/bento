@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from conftest import load_service
+from helpers import load_service
 
 analyzer = load_service("analyzer")
 
