@@ -62,3 +62,4 @@
   .sp-score { align-items: flex-start; }
   .sp-uptime dd { font-size: 1.25rem; }
 }
+.sp-card .sev { text-transform: none; }
