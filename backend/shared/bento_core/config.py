@@ -22,6 +22,15 @@ class Settings:
     jwt_secret = _env("JWT_SECRET")
     jwt_ttl_hours = int(_env("JWT_TTL_HOURS", "168"))
     github_webhook_secret = _env("GITHUB_WEBHOOK_SECRET")
+    # GitHub App (private repos, "Sign in with GitHub", PR checks). See README "Connect GitHub".
+    github_app_id = _env("GITHUB_APP_ID")
+    github_app_slug = _env("GITHUB_APP_SLUG")
+    # PEM key; a single-line value with literal "\n" sequences (as in .env files) is accepted too
+    github_app_private_key = (_env("GITHUB_APP_PRIVATE_KEY") or "").replace("\\n", "\n") or None
+    github_client_id = _env("GITHUB_CLIENT_ID")
+    github_client_secret = _env("GITHUB_CLIENT_SECRET")
+    # Where browsers reach Bento (used to build OAuth redirect URLs)
+    public_url = (_env("PUBLIC_URL", "http://localhost:8080") or "").rstrip("/")
     slack_webhook_url = _env("SLACK_WEBHOOK_URL")
 
     default_probe_interval = int(_env("PROBE_INTERVAL_SECONDS", "60"))
