@@ -40,6 +40,8 @@ def client():
             asyncio.run(_ensure_db(url))
         redis.Redis.from_url(os.environ["REDIS_URL"], socket_connect_timeout=3).ping()
     except (OSError, asyncpg.PostgresError, redis.RedisError, asyncio.TimeoutError) as exc:
+        if os.environ.get("BENTO_REQUIRE_INTEGRATION"):  # CI: a skipped suite must not look green
+            pytest.fail(f"integration services unreachable: {exc}")
         pytest.skip(f"integration services unreachable: {exc}")
 
     from app.main import app
