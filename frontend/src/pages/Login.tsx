@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, api, auth } from '../lib/api';
+import { RiceBallInline } from '../components/RiceBall';
 import './Login.css';
 
 import zoom1Img from '../assets/compartmentzoom1.svg';
@@ -120,7 +121,7 @@ export default function Login() {
             {error && <p className="auth-error" role="alert">{error}</p>}
 
             <button type="submit" className="auth-submit" disabled={busy}>
-              {busy ? (isLogin ? 'Signing in…' : 'Creating account…') : isLogin ? 'Sign in' : 'Create account'}
+              {busy ? <><RiceBallInline />{isLogin ? 'Signing in…' : 'Creating account…'}</> : isLogin ? 'Sign in' : 'Create account'}
             </button>
           </form>
 
