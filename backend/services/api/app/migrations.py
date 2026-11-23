@@ -136,6 +136,11 @@ CREATE TABLE IF NOT EXISTS github_installations (
 -- Projects imported through the app are cloned with an installation token (private repos work)
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS installation_id BIGINT;
 CREATE INDEX IF NOT EXISTS projects_installation_idx ON projects (installation_id);
+
+-- Public status page + README badge: private by default. The slug is kept when the page is
+-- turned off, so turning it back on restores the same URL (and existing badges keep working).
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS public_slug TEXT UNIQUE;
 """
 
 TIMESCALE = """
