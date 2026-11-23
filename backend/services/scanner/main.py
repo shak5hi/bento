@@ -13,7 +13,7 @@ from pathlib import Path
 
 import httpx
 
-from bento_core import streams
+from bento_core import github, streams
 from bento_core.config import settings
 from bento_core.db import create_pool
 from bento_core.log import setup_logging
@@ -38,9 +38,10 @@ class ScanError(Exception):
     pass
 
 
-async def git(*args: str, cwd: str | None = None) -> str:
+async def git(*args: str, cwd: str | None = None, auth: str | None = None) -> str:
+    extra = ("-c", f"http.extraHeader={auth}") if auth else ()
     proc = await asyncio.create_subprocess_exec(
-        "git", *GIT_SAFE, *args, cwd=cwd, env=GIT_ENV,
+        "git", *GIT_SAFE, *extra, *args, cwd=cwd, env=GIT_ENV,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
     try:
@@ -53,8 +54,8 @@ async def git(*args: str, cwd: str | None = None) -> str:
     return out.decode().strip()
 
 
-async def resolve_head(url: str) -> str:
-    out = await git("ls-remote", url, "HEAD")
+async def resolve_head(url: str, auth: str | None = None) -> str:
+    out = await git("ls-remote", url, "HEAD", auth=auth)
     if not out:
         raise ScanError("repository has no HEAD (empty or private)")
     return out.split()[0]
@@ -73,12 +74,21 @@ class Scanner:
             await self.run(job)
 
     async def run(self, job: dict) -> None:
-        project = await self.pg.fetchrow("SELECT id, owner_id, name, repo_url FROM projects WHERE id = $1", job["project_id"])
+        project = await self.pg.fetchrow(
+            "SELECT id, owner_id, name, repo_url, installation_id FROM projects WHERE id = $1", job["project_id"]
+        )
         if project is None or not project["repo_url"] or repo_url_error(project["repo_url"]):
             return
         name, url = project["name"], project["repo_url"]
+        auth = None
         try:
-            sha = job.get("sha") or await resolve_head(url)
+            if project["installation_id"]:  # imported through the GitHub App: private repos work too
+                token = await github.installation_token(project["installation_id"], self.http)
+                auth = github.git_auth_header(token)
+            sha = job.get("sha") or await resolve_head(url, auth)
+        except github.GitHubError as exc:
+            await self.fail(project, str(exc))
+            return
         except ScanError as exc:
             await self.fail(project, f"Could not reach {url}: {exc}")
             return
@@ -111,7 +121,7 @@ class Scanner:
         workdir = tempfile.mkdtemp(prefix="scan-")
         try:
             await git("init", "--quiet", workdir)
-            await git("fetch", "--quiet", "--depth", "1", url, sha, cwd=workdir)
+            await git("fetch", "--quiet", "--depth", "1", url, sha, cwd=workdir, auth=auth)
             await git("checkout", "--quiet", "FETCH_HEAD", cwd=workdir)
             root = Path(workdir)
             if dir_size_mb(root) > MAX_REPO_MB:
