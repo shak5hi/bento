@@ -1,6 +1,8 @@
 """Repo scanner: scan.jobs -> findings.
 
 * Dedupe by commit SHA: GitHub may deliver the same push several times; each commit is scanned once.
+* Checks: hygiene (tests, CI, README, lockfile, .env files), secrets in code, known-vulnerable and
+  outdated dependencies, Dockerfile practices. Secret values are never stored, logged or shown.
 * Sandboxed: shallow fetch of exactly one commit into a throwaway directory, as an unprivileged
   user, with timeouts and a size cap. Repository code is read, never executed.
 """
@@ -20,6 +22,9 @@ from bento_core.log import setup_logging
 from bento_core.net import repo_url_error
 
 from checks import hygiene, list_files, vulnerabilities
+from dockerfile import dockerfiles
+from outdated import outdated
+from secretscan import secrets_in_code
 
 log = setup_logging()
 
@@ -130,7 +135,10 @@ class Scanner:
             root = Path(workdir)
             if dir_size_mb(root) > MAX_REPO_MB:
                 raise ScanError(f"repository is larger than {MAX_REPO_MB} MB")
-            found = hygiene(list_files(root)) + await vulnerabilities(root, self.http)
+            files = list_files(root)
+            # file reads are blocking: keep them off the event loop
+            local = await asyncio.to_thread(lambda: hygiene(files) + secrets_in_code(root, files) + dockerfiles(root, files))
+            found = local + await vulnerabilities(root, self.http) + await outdated(root, self.http, self.r)
         except ScanError as exc:
             await self.pg.execute(
                 "UPDATE scans SET status = 'failed', error = $3, finished_at = now() WHERE project_id = $1 AND sha = $2",
