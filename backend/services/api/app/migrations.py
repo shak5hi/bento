@@ -114,6 +114,9 @@ CREATE TABLE IF NOT EXISTS notifications (
   read_at    TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS notifications_owner_idx ON notifications (owner_id, created_at DESC);
+
+-- Why the most recent scan attempt failed (NULL after a successful scan)
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS last_scan_error TEXT;
 """
 
 TIMESCALE = """

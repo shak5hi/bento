@@ -65,6 +65,7 @@ def project_json(row, score=None) -> dict:
         "repoUrl": row["repo_url"],
         "lastScanAt": row["last_scan_at"],
         "lastScanSha": row["last_scan_sha"],
+        "lastScanError": row["last_scan_error"],
         "createdAt": row["created_at"],
         "health": total,
         "status": status_for(total),
