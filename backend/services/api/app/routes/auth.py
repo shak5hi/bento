@@ -42,8 +42,8 @@ async def register(body: RegisterBody):
 @router.post("/login", dependencies=[auth_limit])
 async def login(body: LoginBody):
     row = await state.pg.fetchrow("SELECT id, email, name, password_hash FROM users WHERE email = $1", body.email.lower())
-    valid = verify_password(body.password, row["password_hash"] if row else DUMMY_HASH)
-    if row is None or not valid:
+    valid = verify_password(body.password, (row["password_hash"] if row else None) or DUMMY_HASH)
+    if row is None or not row["password_hash"] or not valid:
         raise HTTPException(401, "Incorrect email or password")
     return {"token": issue_token(row["id"], row["email"]), "user": _user(row)}
 

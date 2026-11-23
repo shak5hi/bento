@@ -248,3 +248,30 @@
   .auth { grid-template-columns: 1fr; }
   .auth-art { display: none; }
 }
+
+.auth-github {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.auth-github:hover { border-color: var(--ink); }
+
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 4px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }

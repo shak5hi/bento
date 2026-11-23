@@ -53,7 +53,9 @@ endpoints is scored on code alone and marked "code only".
 | `GET/POST /projects` · `GET/PATCH/DELETE /projects/{id}` | projects (detail includes endpoints, findings, incidents, Pickle's advice) |
 | `GET /projects/{id}/latency?minutes=60` | p95 latency series |
 | `POST /projects/{id}/scan` · `POST /projects/{id}/endpoints` · `DELETE /endpoints/{id}` | actions |
-| `POST /webhooks/github` | push webhook (needs `GITHUB_WEBHOOK_SECRET`) |
+| `GET /auth/providers` · `GET /auth/github/login` · `GET /auth/github/callback` | Sign in with GitHub |
+| `GET /github/status` · `POST /github/connect` · `GET /github/repos` · `POST /github/import` | connect the GitHub App, list and import repositories |
+| `POST /webhooks/github` | push + installation webhooks (needs `GITHUB_WEBHOOK_SECRET`) |
 | `GET /system` | pipeline status for the dashboard |
 
 Interactive docs: http://localhost:8081/api/docs · Pipeline health: http://localhost:8081/health/services
@@ -72,6 +74,43 @@ Interactive docs: http://localhost:8081/api/docs · Pipeline health: http://loca
 
 To receive GitHub webhooks locally, expose port 8081 with a tunnel (e.g. `cloudflared`, `ngrok`) and point
 the webhook at `https://<tunnel>/api/webhooks/github` with content type `application/json`.
+
+## Connect GitHub (GitHub App)
+
+Bento connects to GitHub as a **GitHub App**. That gives users "Sign in with GitHub", lets them pick
+repositories (private ones too) instead of pasting URLs, and scans every push automatically. Without these
+settings Bento still works with public repository URLs.
+
+1. Open **https://github.com/settings/apps/new** and fill in:
+   | Field | Value |
+   |---|---|
+   | GitHub App name | anything unique, e.g. `bento-yourname` (the URL slug becomes `GITHUB_APP_SLUG`) |
+   | Homepage URL | your `PUBLIC_URL` (e.g. `http://localhost:8080`) |
+   | Callback URL | `<PUBLIC_URL>/api/auth/github/callback` |
+   | ☑ Request user authorization (OAuth) during installation | checked |
+   | Setup URL | `<PUBLIC_URL>/api/auth/github/callback`, ☑ Redirect on update |
+   | Webhook | ☑ Active, URL `https://<public-host>/api/webhooks/github`, secret = a long random string |
+2. **Permissions** - Repository: *Contents* read & write, *Pull requests* read & write, *Checks* read & write,
+   *Metadata* read. Account: *Email addresses* read.
+   (Write access is used by PR checks and auto-fix pull requests; scanning only reads.)
+3. **Subscribe to events**: *Push*, *Pull request*.
+4. Create the app, then on its page: copy the **App ID** and **Client ID**, generate a **client secret**, and
+   generate a **private key** (downloads a `.pem`).
+5. Put them in `backend/.env`:
+   ```bash
+   GITHUB_APP_ID=123456
+   GITHUB_APP_SLUG=bento-yourname
+   GITHUB_CLIENT_ID=Iv23li...
+   GITHUB_CLIENT_SECRET=...
+   GITHUB_WEBHOOK_SECRET=<the webhook secret from step 1>
+   # the .pem on one line:  awk 'NF {printf "%s\\n", $0}' your-key.pem
+   GITHUB_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n
+   ```
+6. `docker compose up -d` - the login page now shows **Continue with GitHub**, and **New project → From GitHub**
+   lists your repositories. A repository's *Website* field on GitHub is monitored automatically.
+
+Sign-in works on `localhost` as-is (GitHub redirects your browser). Only push webhooks need a public URL - use a
+tunnel (`cloudflared tunnel --url http://localhost:8080`) locally, and update the app's webhook URL to match.
 
 ## Layout
 

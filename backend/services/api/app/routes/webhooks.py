@@ -42,10 +42,12 @@ async def github(
 
     if x_github_event == "ping":
         return {"ok": True, "pong": True}
+    payload = json.loads(body)
+    if x_github_event in ("installation", "installation_repositories"):
+        return await _installation_event(x_github_event, payload)
     if x_github_event != "push":
         return {"ok": True, "ignored": x_github_event}
 
-    payload = json.loads(body)
     full_name = (payload.get("repository", {}).get("full_name") or "").lower()
     sha = payload.get("after")
     if not full_name or not sha or set(sha) == {"0"}:  # branch deletion
@@ -60,3 +62,20 @@ async def github(
         )
     log.info("push %s@%s (delivery %s) -> %d scan job(s)", full_name, sha[:7], x_github_delivery, len(rows))
     return {"ok": True, "queued": len(rows)}
+
+
+async def _installation_event(event: str, payload: dict) -> dict:
+    """Keep access in sync when the Bento app is uninstalled or loses repositories."""
+    inst_id = payload.get("installation", {}).get("id")
+    action = payload.get("action")
+    if event == "installation" and action == "deleted":
+        await state.pg.execute("UPDATE projects SET installation_id = NULL WHERE installation_id = $1", inst_id)
+        await state.pg.execute("DELETE FROM github_installations WHERE id = $1", inst_id)
+        log.info("installation %s deleted", inst_id)
+    elif event == "installation_repositories" and action == "removed":
+        names = [r["full_name"].lower() for r in payload.get("repositories_removed", [])]
+        await state.pg.execute(
+            "UPDATE projects SET installation_id = NULL WHERE installation_id = $1 AND repo_full_name = ANY($2::text[])",
+            inst_id, names,
+        )
+    return {"ok": True, "event": event, "action": action}
