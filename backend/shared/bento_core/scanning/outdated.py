@@ -1,7 +1,7 @@
 """Outdated dependencies: direct npm and PyPI dependencies a major version or more behind the latest release.
 
-Latest versions come from the public registries, with short timeouts, bounded concurrency and a Redis
-cache (6 h), so rescanning many projects doesn't hammer npm or PyPI. One finding per ecosystem
+Latest versions come from the public registries, with short timeouts, bounded concurrency and a cache
+(Redis in the scanner, in memory in the CLI; 6 h), so rescanning many projects doesn't hammer npm or PyPI. One finding per ecosystem
 (`outdated:npm`, `outdated:PyPI`) keeps the score from being swamped by a long tail of minor upgrades;
 the detail lists the packages furthest behind.
 """
@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 import httpx
 
-from checks import _pypi_packages, finding
+from .checks import _pypi_packages, finding
 
 log = logging.getLogger(__name__)
 
@@ -71,9 +71,9 @@ def npm_direct(root: Path) -> dict[str, str]:
     return out
 
 
-async def _latest(eco: str, name: str, http: httpx.AsyncClient, r, sem: asyncio.Semaphore) -> str | None:
+async def _latest(eco: str, name: str, http: httpx.AsyncClient, cache, sem: asyncio.Semaphore) -> str | None:
     key = f"registry:{eco}:{name.lower()}"
-    cached = await r.get(key)
+    cached = await cache.get(key)
     if cached is not None:
         cached = cached.decode() if isinstance(cached, bytes) else cached
         return cached or None
@@ -90,18 +90,19 @@ async def _latest(eco: str, name: str, http: httpx.AsyncClient, r, sem: asyncio.
         except (httpx.HTTPError, ValueError) as exc:
             log.info("registry lookup failed for %s %s: %s", eco, name, type(exc).__name__)
             return None
-    await r.set(key, latest or "", ex=CACHE_TTL_S if latest else MISS_TTL_S)
+    await cache.set(key, latest or "", ex=CACHE_TTL_S if latest else MISS_TTL_S)
     return latest
 
 
-async def outdated(root: Path, http: httpx.AsyncClient, r) -> list[dict]:
+async def outdated(root: Path, http: httpx.AsyncClient, cache) -> list[dict]:
+    """cache: anything with async get(key) / set(key, value, ex=seconds), e.g. a Redis client."""
     sem = asyncio.Semaphore(CONCURRENCY)
     out = []
     for eco, pkgs in (("npm", npm_direct(root)), ("PyPI", _pypi_packages(root))):
         items = list(pkgs.items())[:MAX_PACKAGES]
         if not items:
             continue
-        latest = await asyncio.gather(*(_latest(eco, n, http, r, sem) for n, _ in items))
+        latest = await asyncio.gather(*(_latest(eco, n, http, cache, sem) for n, _ in items))
         behind = []
         for (name, current), new in zip(items, latest):
             if not new or _is_prerelease(new):

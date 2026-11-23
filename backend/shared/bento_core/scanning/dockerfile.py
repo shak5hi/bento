@@ -4,7 +4,7 @@ no HEALTHCHECK. Keys are `docker:<check>:<path>` so they stay stable across comm
 import re
 from pathlib import Path
 
-from checks import finding
+from .checks import finding
 
 MAX_DOCKERFILE_BYTES = 256 * 1024
 SECRET_NAME = re.compile(r"(?i)(secret|token|passw(or)?d|pwd|api[_-]?key|access[_-]?key|private[_-]?key|credential)")
