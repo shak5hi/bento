@@ -182,3 +182,15 @@ def test_change_reasons():
         "Fixed: Leaked key · New problem: No CI · Website grade B → C"
     assert change_reason(before, {"findings": {}, "website": "B"}) == "Fixed 2 problems"
     assert change_reason(before, dict(before)) == "Scoring updated"
+
+
+def test_security_comes_first_while_it_caps_the_score():
+    findings = [f("secret:private-key:a.key", "critical", "Private key in a.key", effort=30),
+                f("secret:generic-secret:b.js", "high", "Password in b.js", effort=20),
+                f("outdated:npm", "medium", meta={"behind": 5}), f("no-ci", effort=30)]
+    result = score_project(findings, GOOD_SITE, endpoints=1, scanned=True, facts={"deps_checked": {"npm": 10}})
+    nxt = result["next"]
+    assert nxt["key"] == "secret:private-key:a.key"
+    assert nxt["title"].startswith("Fix the 2 security problems") and nxt["gain"] > 0 and nxt["effortMinutes"] == 50
+    fixed = [x for x in findings if not x["key"].startswith("secret:")]
+    assert score_project(fixed, GOOD_SITE, 1, True, {"deps_checked": {"npm": 10}})["total"] - result["total"] == nxt["gain"]

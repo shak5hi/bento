@@ -203,7 +203,27 @@ def score_project(findings: list[dict], probes: dict | None, endpoints: int, sca
 
 
 def next_action(findings, probes, endpoints, scanned, facts, total) -> dict | None:
-    """The single fix that raises the overall score most (ties: the quicker fix)."""
+    """The single fix that raises the overall score most (ties: the quicker fix).
+
+    While Security caps the score, security comes first: fixing one of several serious problems may not
+    lift the cap on its own, but nothing else matters as much, so the advice is to fix that group.
+    """
+    security = sorted((f for f in findings if category(f["key"]) == "security"),
+                      key=lambda f: SEVERITY_ORDER.index(f["severity"]))
+    if security and security_card(findings, scanned)["grade"] in CAPS:
+        rest = [g for g in findings if category(g["key"]) != "security"]
+        cards = {
+            "security": security_card(rest, scanned), "website": website_card(probes, endpoints),
+            "basics": basics_card(rest, scanned), "upkeep": upkeep_card(rest, facts),
+        }
+        gain = (overall(cards)["total"] or 0) - (total or 0)
+        first = security[0]
+        if len(security) == 1:
+            title = first["title"]
+        else:
+            title = f"Fix the {len(security)} security problems, starting with: {first['title']}"
+        return {"key": first["key"], "title": title, "gain": gain if gain > 0 else None,
+                "effortMinutes": sum(f.get("effort_minutes") or 20 for f in security)}
     best = None
     for f in findings:
         rest = [g for g in findings if g is not f]
