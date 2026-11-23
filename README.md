@@ -47,7 +47,7 @@ PROBE PIPELINE
 5. **Explain.** Pickle ranks incidents and findings by severity and writes a brief plus at most three
    recommendations. It is rule-based: no external AI service.
 
-Seven Python services talk over **Redis Streams** with consumer groups, so work survives crashes (unacked jobs
+Eight Python services talk over **Redis Streams** with consumer groups, so work survives crashes (unacked jobs
 are reclaimed after 30 s) and probers scale horizontally. Details: [`backend/README.md`](backend/README.md).
 
 ## Frontend
@@ -67,7 +67,7 @@ apart and the food items settle into place as you scroll.
 bento/
 ├── frontend/              React 19 + Vite + TypeScript: 3D landing, login, dashboard
 ├── backend/
-│   ├── docker-compose.yml the whole stack (12 containers)
+│   ├── docker-compose.yml the whole stack (13 containers)
 │   ├── services/
 │   │   ├── api/           FastAPI gateway: auth, GitHub App, projects, dashboard, webhooks
 │   │   ├── scheduler/     probe schedule (Redis ZSET, jittered)
@@ -75,7 +75,8 @@ bento/
 │   │   ├── analyzer/      EWMA anomaly detection, incidents, health scores
 │   │   ├── notifier/      alerts with dedup and cooldown
 │   │   ├── scanner/       sandboxed repository scans
-│   │   └── advisor/       Pickle
+│   │   ├── advisor/       Pickle
+│   │   └── fixer/         auto-fix pull requests (never touches the default branch)
 │   └── shared/bento_core/ config, DB pools, streams, scoring, GitHub client
 └── screenshots/
 ```
@@ -98,7 +99,7 @@ private repositories, create a GitHub App: see [Connect GitHub](backend/README.m
 - [x] Engineering Health Score and Pickle's daily brief
 - [x] Connect GitHub: sign in, import repositories (private too), scan on push
 - [ ] Pull request checks
-- [ ] Auto-fix pull requests (always waiting for human approval)
+- [x] Auto-fix pull requests (always waiting for human approval)
 - [x] Public status pages and README badges
 - [ ] Email alerts and a weekly digest
 - [x] Deeper scanning: secrets in code, outdated dependencies, Dockerfiles
