@@ -22,7 +22,6 @@ class Settings:
     jwt_secret = _env("JWT_SECRET")
     jwt_ttl_hours = int(_env("JWT_TTL_HOURS", "168"))
     github_webhook_secret = _env("GITHUB_WEBHOOK_SECRET")
-    anthropic_api_key = _env("ANTHROPIC_API_KEY")
     slack_webhook_url = _env("SLACK_WEBHOOK_URL")
 
     default_probe_interval = int(_env("PROBE_INTERVAL_SECONDS", "60"))

@@ -96,9 +96,12 @@ CREATE TABLE IF NOT EXISTS advice (
   findings_hash   TEXT,
   brief           TEXT NOT NULL,
   recommendations JSONB NOT NULL DEFAULT '[]',
-  source          TEXT NOT NULL CHECK (source IN ('ai', 'rules')),
+  source          TEXT NOT NULL DEFAULT 'rules',
   generated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Pickle is rule-based only: drop the old constraint on the advice source
+ALTER TABLE advice DROP CONSTRAINT IF EXISTS advice_source_check;
 
 CREATE TABLE IF NOT EXISTS notifications (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),

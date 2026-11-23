@@ -119,9 +119,7 @@ services:
   advisor:
     <<: *worker
     build: { context: ., dockerfile: docker/python.Dockerfile, args: { SERVICE: advisor } }
-    environment:
-      <<: *env
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    environment: *env
 
   # ─────────────── Data stores ───────────────
   postgres: # projects, findings, incidents, advice, users

@@ -11,6 +11,6 @@ def setup_logging() -> logging.Logger:
         format=f"%(asctime)s [{settings.service}] %(levelname)s %(message)s",
         datefmt="%H:%M:%S",
     )
-    for noisy in ("httpx", "httpcore", "anthropic"):
+    for noisy in ("httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     return logging.getLogger(settings.service)
