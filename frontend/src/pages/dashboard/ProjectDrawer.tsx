@@ -10,12 +10,7 @@ interface Props {
   onChanged: () => void;
 }
 
-const PARTS = [
-  { key: 'uptime', label: 'Uptime', max: 40 },
-  { key: 'latency', label: 'Latency', max: 20 },
-  { key: 'errors', label: 'Errors', max: 20 },
-  { key: 'code', label: 'Code', max: 20 },
-] as const;
+const CARD_ORDER = ['security', 'website', 'basics', 'upkeep'] as const;
 
 const EP_STATE = { normal: 'Normal', failing: 'Failing', incident: 'Incident', pending: 'First probe soon' } as const;
 
@@ -168,24 +163,58 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
             <section className="d-section d-score">
               <div className="d-score-num">
                 <span className="big">{p.health ?? '—'}</span>
+                {p.grade && <span className={`grade g-${p.grade}`}>Grade {p.grade}</span>}
                 <span className={`status-text s-${p.status}`}>{STATUS_LABEL[p.status]}</span>
-                {p.parts?.basis === 'code' && <span className="muted small">Scored on code only — add an endpoint for live health.</span>}
+                {p.weekChange != null && p.weekChange !== 0 && (
+                  <span className={`small ${p.weekChange > 0 ? 'up' : 'down'}`}>
+                    {p.weekChange > 0 ? '▲' : '▼'} {Math.abs(p.weekChange)} this week
+                  </span>
+                )}
               </div>
-              <div className="bars">
-                {PARTS.map(({ key, label, max }) => {
-                  const v = p.parts?.[key] ?? null;
+              <div className="cards">
+                {CARD_ORDER.map((key) => {
+                  const c = p.cards?.[key];
+                  if (!c) return null;
                   return (
-                    <div className="bar" key={key}>
-                      <span>{label}</span>
-                      <span className="track">
-                        <span className={`fill ${v === null ? '' : v / max >= 0.8 ? 'f-healthy' : v / max >= 0.5 ? 'f-degraded' : 'f-critical'}`} style={{ width: `${v === null ? 0 : (v / max) * 100}%` }} />
-                      </span>
-                      <span className="num">{v === null ? '—' : `${Math.round(v * 10) / 10}/${max}`}</span>
+                    <div className="card" key={key} title={c.items.map((i) => i.label).join(' · ')}>
+                      <span className="card-label">{c.label}</span>
+                      <span className={`card-grade ${c.grade ? `g-${c.grade}` : 'g-none'}`}>{c.grade ?? '—'}</span>
+                      <span className="card-summary">{c.summary}</span>
                     </div>
                   );
                 })}
               </div>
             </section>
+
+            {(p.nextAction || p.capped) && (
+              <section className="d-section next-action">
+                {p.nextAction && (
+                  <p>
+                    <span className="label">Do this next</span>
+                    {p.nextAction.title}
+                    {p.nextAction.gain ? <strong> +{p.nextAction.gain} points</strong> : null}
+                  </p>
+                )}
+                {p.capped && <p className="muted small">{p.capped}.</p>}
+              </section>
+            )}
+
+            {data.history.length > 0 && (
+              <section className="d-section">
+                <h3>Score history</h3>
+                <ul className="rows">
+                  {data.history.slice(0, 6).map((h) => (
+                    <li key={h.at} className="row">
+                      <span className={h.previous === null || h.total >= h.previous ? 'up' : 'down'}>
+                        {h.previous === null ? h.total : `${h.previous} → ${h.total}`}
+                      </span>
+                      <span className="row-main" title={h.reason}>{h.reason}</span>
+                      <span className="muted">{timeAgo(h.at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {data.advice && (
               <section className="pickle pickle-sm">

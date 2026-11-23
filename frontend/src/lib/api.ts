@@ -79,11 +79,35 @@ export interface Task {
   since: string;
 }
 
+export type Grade = 'A' | 'B' | 'C' | 'D' | 'F';
+export type CardKey = 'security' | 'website' | 'basics' | 'upkeep';
+
+/** One report card (bento_core.scoring). Unmeasured cards say why instead of pretending to be perfect. */
+export interface ScoreCard {
+  key: CardKey;
+  label: string;
+  score: number | null;
+  grade: Grade | null;
+  state: 'measured' | 'not_monitored' | 'measuring' | 'not_checked';
+  summary: string;
+  items: { label: string; key?: string; severity?: Severity; done?: boolean; points?: number }[];
+}
+
+export interface NextAction {
+  key: string;
+  title: string;
+  gain: number | null;
+  effortMinutes: number | null;
+}
+
 export interface ProjectSummary {
   id: string;
   name: string;
   repoUrl: string | null;
   health: number | null;
+  grade: Grade | null;
+  weekChange: number | null;
+  nextAction: NextAction | null;
   basis: 'full' | 'code' | null;
   status: Status;
   endpoints: number;
@@ -130,8 +154,14 @@ export interface ProjectDetail {
     publicSlug: string | null;
     health: number | null;
     status: Status;
-    parts: { uptime: number | null; latency: number | null; errors: number | null; code: number; basis: string } | null;
+    grade: Grade | null;
+    basis: 'full' | 'code' | null;
+    cards: Record<CardKey, ScoreCard> | null;
+    nextAction: NextAction | null;
+    capped: string | null;
+    weekChange: number | null;
   };
+  history: { at: string; total: number; previous: number | null; grade: Grade | null; reason: string }[];
   endpoints: {
     id: string;
     url: string;
