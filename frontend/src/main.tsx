@@ -10,6 +10,7 @@ const App = lazy(() => import('./App.tsx'))
 const Login = lazy(() => import('./pages/Login.tsx'))
 const Dashboard = lazy(() => import('./pages/Dashboard.tsx'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback.tsx'))
+const StatusPage = lazy(() => import('./pages/StatusPage.tsx'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -19,6 +20,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<App />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/status/:slug" element={<StatusPage />} />
           <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
