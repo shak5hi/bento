@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import logoSrc from '../assets/logo.png';
 
 /**
  * A crafted, static replica of the real dashboard for the landing page.
@@ -13,7 +14,7 @@ export const DashboardPreview = forwardRef<HTMLDivElement, { className?: string 
   return (
     <div ref={ref} className={`dp ${className ?? ''}`} role="img" aria-label="Preview of the Bento dashboard with example projects">
       <div className="dp-bar">
-        <span className="dp-brand"><i>B</i> Bento</span>
+        <span className="dp-brand"><img src={logoSrc} alt="Bento" /></span>
         <span className="dp-live"><b /> Monitoring live</span>
       </div>
       <div className="dp-body">

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api, type LatencyPoint, type ProjectDetail } from '../../lib/api';
 import { SEVERITY_LABEL, STATUS_LABEL, effort, host, timeAgo } from '../../lib/format';
 import { LineChart } from '../../components/LineChart';
+import { RiceBall, RiceBallInline } from '../../components/RiceBall';
 
 interface Props {
   projectId: string;
@@ -101,7 +102,7 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
         <header className="drawer-head">
           <div>
             <p className="eyebrow">Project</p>
-            <h2>{p?.name ?? 'Loading…'}</h2>
+            <h2>{p?.name ?? <>&nbsp;</>}</h2>
             {p?.repoUrl && (
               <a className="drawer-link" href={p.repoUrl} target="_blank" rel="noreferrer">
                 {host(p.repoUrl)} ↗
@@ -113,6 +114,8 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
 
         {error && <div className="notice notice-crit" role="alert">{error}</div>}
         {toast && <div className="notice" role="status">{toast}</div>}
+
+        {!data && !error && <RiceBall label="Loading project" />}
 
         {data && p && (
           <>
@@ -210,7 +213,7 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
               </ul>
               <form className="inline-form" onSubmit={addEndpoint}>
                 <input type="url" placeholder="https://api.example.com/health" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} aria-label="Endpoint URL" />
-                <button className="btn" disabled={busy === 'add' || !newUrl.trim()}>Add</button>
+                <button className="btn" disabled={busy === 'add' || !newUrl.trim()}>{busy === 'add' ? <><RiceBallInline />Adding…</> : 'Add'}</button>
               </form>
             </section>
 
@@ -262,10 +265,10 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
             <footer className="drawer-foot">
               {p.repoUrl && (
                 <button className="btn" disabled={busy === 'scan'} onClick={() => run('scan', () => api(`/projects/${projectId}/scan`, { method: 'POST' }), 'Scan queued.')}>
-                  {busy === 'scan' ? 'Queuing…' : 'Scan now'}
+                  {busy === 'scan' ? <><RiceBallInline />Queuing…</> : 'Scan now'}
                 </button>
               )}
-              <button className="btn btn-danger" disabled={busy === 'delete'} onClick={remove}>Delete project</button>
+              <button className="btn btn-danger" disabled={busy === 'delete'} onClick={remove}>{busy === 'delete' ? <><RiceBallInline />Deleting…</> : 'Delete project'}</button>
             </footer>
           </>
         )}

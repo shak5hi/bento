@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, api, type GitHubRepo, type GitHubStatus } from '../../lib/api';
+import { RiceBall, RiceBallInline } from '../../components/RiceBall';
 
 interface Props {
   onClose: () => void;
@@ -117,7 +118,7 @@ function GitHubImport({ status, onClose, onCreated, onImported }: Props & { stat
         <div className="dialog-actions">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
           <button type="button" className="btn btn-primary" disabled={busy} onClick={() => connect('installUrl')}>
-            {busy ? 'Opening GitHub…' : 'Connect GitHub'}
+            {busy ? <><RiceBallInline />Opening GitHub…</> : 'Connect GitHub'}
           </button>
         </div>
       </>
@@ -135,7 +136,7 @@ function GitHubImport({ status, onClose, onCreated, onImported }: Props & { stat
       <input className="repo-search" placeholder="Search repositories" value={query} onChange={(e) => setQuery(e.target.value)} />
 
       <ul className="repo-list" aria-busy={repos === null}>
-        {repos === null && !error && <li className="muted small repo-empty">Loading your repositories…</li>}
+        {repos === null && !error && <li><RiceBall size={40} label="Loading your repositories" /></li>}
         {repos !== null && visible.length === 0 && (
           <li className="muted small repo-empty">{repos.length === 0 ? 'Bento has no repositories yet — use “Change repository access”.' : 'No matches.'}</li>
         )}
@@ -166,7 +167,7 @@ function GitHubImport({ status, onClose, onCreated, onImported }: Props & { stat
       <div className="dialog-actions">
         <button type="button" className="btn" onClick={onClose}>Cancel</button>
         <button type="button" className="btn btn-primary" disabled={busy || picked.size === 0} onClick={importRepos}>
-          {busy ? 'Importing…' : picked.size > 1 ? `Import ${picked.size} projects` : 'Import project'}
+          {busy ? <><RiceBallInline />Importing…</> : picked.size > 1 ? `Import ${picked.size} projects` : 'Import project'}
         </button>
       </div>
     </>
@@ -229,7 +230,7 @@ function ManualForm({ onClose, onCreated }: Pick<Props, 'onClose' | 'onCreated'>
       <div className="dialog-actions">
         <button type="button" className="btn" onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary" disabled={busy || !name.trim()}>
-          {busy ? 'Adding…' : 'Add project'}
+          {busy ? <><RiceBallInline />Adding…</> : 'Add project'}
         </button>
       </div>
     </form>
