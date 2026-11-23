@@ -1,0 +1,22 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Environment
+.env
+*.local
+
+# Logs
+*.log
