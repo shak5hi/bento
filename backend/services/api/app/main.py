@@ -16,7 +16,7 @@ from bento_core.db import create_pool
 from bento_core.log import setup_logging
 
 from .migrations import migrate
-from .routes import auth, dashboard, github, projects, system, webhooks
+from .routes import auth, dashboard, github, projects, public, system, webhooks
 from .state import state
 
 log = setup_logging()
@@ -56,5 +56,5 @@ async def validation_error(_: Request, exc: RequestValidationError):
     return JSONResponse(status_code=422, content={"detail": details[0]["message"] if details else "Invalid request", "errors": details})
 
 
-for router in (system.router, auth.router, github.router, projects.router, dashboard.router, webhooks.router):
+for router in (system.router, auth.router, github.router, projects.router, public.router, dashboard.router, webhooks.router):
     app.include_router(router)

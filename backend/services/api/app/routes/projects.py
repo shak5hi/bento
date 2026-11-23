@@ -1,4 +1,8 @@
+import re
+import secrets
 from uuid import UUID
+
+import asyncpg
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -23,6 +27,10 @@ class ProjectBody(BaseModel):
 class ProjectPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     repo_url: str | None = Field(default=None, max_length=500)
+
+
+class PublicBody(BaseModel):
+    enabled: bool
 
 
 class EndpointBody(BaseModel):
@@ -67,6 +75,8 @@ def project_json(row, score=None) -> dict:
         "lastScanSha": row["last_scan_sha"],
         "lastScanError": row["last_scan_error"],
         "createdAt": row["created_at"],
+        "isPublic": row["is_public"],
+        "publicSlug": row["public_slug"] if row["is_public"] else None,
         "health": total,
         "status": status_for(total),
         "parts": (
@@ -230,6 +240,34 @@ async def update_project(project_id: UUID, body: ProjectPatch, user_id: UUID = D
     if repo and repo != current["repo_url"]:
         await _queue_scan(project_id, "repo-changed")
     return {"project": project_json(row)}
+
+
+def _new_slug(name: str) -> str:
+    """Readable and unguessable: `my-app-3f9k2a`. Random suffix so private names can't be probed."""
+    base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40].strip("-") or "project"
+    return f"{base}-{secrets.token_hex(3)}"
+
+
+@router.put("/projects/{project_id}/public")
+async def set_public(project_id: UUID, body: PublicBody, user_id: UUID = Depends(current_user_id)):
+    """Turn the public status page and badge on or off. The slug is created once and kept."""
+    current = await owned_project(project_id, user_id)
+    if not body.enabled or current["public_slug"]:
+        row = await state.pg.fetchrow(
+            "UPDATE projects SET is_public = $2 WHERE id = $1 RETURNING *", project_id, body.enabled
+        )
+        return {"project": project_json(row)}
+    for _ in range(5):
+        try:
+            row = await state.pg.fetchrow(
+                "UPDATE projects SET is_public = true, public_slug = $2 WHERE id = $1 RETURNING *",
+                project_id,
+                _new_slug(current["name"]),
+            )
+            return {"project": project_json(row)}
+        except asyncpg.UniqueViolationError:
+            continue
+    raise HTTPException(500, "Could not create a public link, please try again")
 
 
 @router.delete("/projects/{project_id}", status_code=204)
