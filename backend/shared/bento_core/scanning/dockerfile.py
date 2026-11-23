@@ -9,6 +9,10 @@ from .checks import finding
 MAX_DOCKERFILE_BYTES = 256 * 1024
 SECRET_NAME = re.compile(r"(?i)(secret|token|passw(or)?d|pwd|api[_-]?key|access[_-]?key|private[_-]?key|credential)")
 SKIP_DIRS = {"third_party", "bower_components", "testdata", "examples", "fixtures"}
+NOT_DOCKERFILE_EXT = {
+    ".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".go", ".rb", ".rs", ".java", ".kt", ".php", ".cs", ".sh",
+    ".md", ".txt", ".rst", ".json", ".yml", ".yaml", ".toml", ".lock", ".dockerignore", ".j2", ".tmpl", ".template",
+}
 
 
 def is_dockerfile(rel: str) -> bool:
@@ -16,7 +20,10 @@ def is_dockerfile(rel: str) -> bool:
     name = p.name.lower()
     if any(part in SKIP_DIRS for part in p.parts):
         return False
-    return name == "dockerfile" or name.startswith("dockerfile.") or name.endswith(".dockerfile")
+    if name == "dockerfile" or name.endswith(".dockerfile"):
+        return True
+    # Dockerfile.prod, Dockerfile.dev — but not dockerfile.py, Dockerfile.dockerignore, dockerfile.md...
+    return name.startswith("dockerfile.") and p.suffix.lower() not in NOT_DOCKERFILE_EXT
 
 
 def instructions(text: str) -> list[tuple[int, str, str]]:
