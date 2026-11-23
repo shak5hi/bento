@@ -11,6 +11,8 @@ from pathlib import PurePosixPath
 import httpx
 from packaging.version import InvalidVersion, Version
 
+from bento_core.github import fixable_finding as fixable  # one definition, shared with the API
+
 from gh import FixError
 
 ENV_OK = {".env.example", ".env.sample", ".env.template", ".env.dist"}
@@ -22,8 +24,6 @@ FOOTER = (
 )
 
 
-def fixable(key: str) -> bool:
-    return key in ("no-ci", "no-readme", "secrets-env-file") or key.startswith(("vuln:npm:", "vuln:PyPI:"))
 
 
 def branch_for(key: str) -> str:
