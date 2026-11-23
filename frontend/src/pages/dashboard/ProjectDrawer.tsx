@@ -102,7 +102,7 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
         <header className="drawer-head">
           <div>
             <p className="eyebrow">Project</p>
-            <h2>{p?.name ?? ' '}</h2>
+            <h2>{p?.name ?? <>&nbsp;</>}</h2>
             {p?.repoUrl && (
               <a className="drawer-link" href={p.repoUrl} target="_blank" rel="noreferrer">
                 {host(p.repoUrl)} ↗
