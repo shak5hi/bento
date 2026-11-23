@@ -39,9 +39,13 @@ class ScanError(Exception):
 
 
 async def git(*args: str, cwd: str | None = None, auth: str | None = None) -> str:
-    extra = ("-c", f"http.extraHeader={auth}") if auth else ()
+    env = GIT_ENV
+    if auth:
+        # Pass the token through git's environment config, never argv: command lines are visible
+        # in process listings (ps, docker top), environment variables are not.
+        env = {**GIT_ENV, "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "http.extraHeader", "GIT_CONFIG_VALUE_0": auth}
     proc = await asyncio.create_subprocess_exec(
-        "git", *GIT_SAFE, *extra, *args, cwd=cwd, env=GIT_ENV,
+        "git", *GIT_SAFE, *args, cwd=cwd, env=env,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
     try:
