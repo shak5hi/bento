@@ -30,6 +30,8 @@ def _label(health: int | None) -> str:
 def _brief(health, projects, tasks, risk) -> str:
     if not projects:
         return "Add your first project and Pickle will start watching it — uptime, latency, errors and code health."
+    if health is None:
+        return "Pickle is still gathering data on your projects. Check back in a few minutes."
     parts = [f"Your portfolio looks {_label(health)} today."]
     issues = len(tasks)
     if risk is None:

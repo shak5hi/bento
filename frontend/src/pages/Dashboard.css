@@ -311,6 +311,7 @@
 
 .sev { font-weight: 600; font-size: 12px; text-transform: capitalize; }
 .sev-critical { color: var(--crit); }
+.scan-error { color: var(--crit); margin: 0 0 12px; line-height: 1.5; }
 .sev-high { color: var(--crit); }
 .sev-medium { color: var(--warn); }
 .sev-low { color: var(--muted); }

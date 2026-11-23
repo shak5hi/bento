@@ -1,13 +1,17 @@
 """Engineering Health Score (0-100).
 
 Uptime 40 + Latency 20 + Errors 20 + Code 20, over the last 30 minutes of probes.
-Code starts at 20 and loses points per open finding by severity.
-A project with no monitored endpoints is scored on code alone (basis = "code").
+Code is 20 * exp(-penalty / 25), where each open finding adds a penalty by severity. The curve means
+the first serious problems cost the most and a long tail of issues never flattens a project to zero.
+A project with no monitored endpoints is scored on code alone (basis = "code"); a project with neither
+probe data nor a successful scan has no score yet.
 """
 
+import math
 from dataclasses import dataclass
 
 FINDING_PENALTY = {"critical": 8.0, "high": 4.0, "medium": 1.5, "low": 0.5}
+PENALTY_SCALE = 25.0
 
 
 def _clamp(x: float) -> float:
@@ -39,12 +43,18 @@ def status_for(total: int | None) -> str:
 
 
 def code_score(severities: list[str]) -> float:
-    return max(0.0, 20.0 - sum(FINDING_PENALTY.get(s, 0.0) for s in severities))
+    penalty = sum(FINDING_PENALTY.get(s, 0.0) for s in severities)
+    return 20.0 * math.exp(-penalty / PENALTY_SCALE)
 
 
-def health_score(total: int, responded: int, failed: int, p95_ms: float | None, severities: list[str]) -> Score:
+def health_score(
+    total: int, responded: int, failed: int, p95_ms: float | None, severities: list[str], code_known: bool = True
+) -> Score | None:
+    """Return None when there is nothing to score yet (no probes and no successful scan)."""
     code = code_score(severities)
     if total == 0:
+        if not code_known:
+            return None
         return Score(total=round(code * 5), uptime=None, latency=None, errors=None, code=code, basis="code")
 
     uptime_ratio = responded / total

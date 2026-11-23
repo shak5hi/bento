@@ -158,7 +158,7 @@ class Analyzer:
             await asyncio.sleep(SCORE_EVERY_S)
 
     async def score_all(self) -> None:
-        projects = await self.pg.fetch("SELECT id, owner_id FROM projects")
+        projects = await self.pg.fetch("SELECT id, owner_id, last_scan_at FROM projects")
         if not projects:
             return
         stats = {
@@ -182,8 +182,11 @@ class Analyzer:
             s = stats.get(p["id"])
             score = health_score(
                 s["total"] if s else 0, s["responded"] if s else 0, s["failed"] if s else 0,
-                s["p95"] if s else None, sev.get(p["id"], []),
+                s["p95"] if s else None, sev.get(p["id"], []), code_known=p["last_scan_at"] is not None,
             )
+            if score is None:  # nothing measured yet: clear any stale score instead of inventing one
+                await self.pg.execute("DELETE FROM project_scores WHERE project_id = $1", p["id"])
+                continue
             prev = await self.pg.fetchval("SELECT total FROM project_scores WHERE project_id = $1", p["id"])
             await self.pg.execute(
                 """INSERT INTO project_scores (project_id, total, uptime, latency, errors, code, basis, computed_at)

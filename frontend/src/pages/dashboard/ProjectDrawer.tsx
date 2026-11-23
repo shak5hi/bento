@@ -221,8 +221,13 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
                   {p.repoUrl ? `Last scan ${timeAgo(p.lastScanAt)}${p.lastScanSha ? ` · ${p.lastScanSha.slice(0, 7)}` : ''}` : 'No repository connected'}
                 </span>
               </div>
+              {p.lastScanError && (
+                <p className="scan-error small" role="status">
+                  Last scan failed: {p.lastScanError}
+                </p>
+              )}
               {data.findings.length === 0 ? (
-                <p className="muted small">{p.repoUrl ? (p.lastScanAt ? 'The latest scan found nothing to fix.' : 'First scan in progress…') : 'Add a repository to scan dependencies, tests, CI and secrets.'}</p>
+                <p className="muted small">{p.repoUrl ? (p.lastScanAt ? 'The latest scan found nothing to fix.' : p.lastScanError ? 'No successful scan yet.' : 'First scan in progress…') : 'Add a repository to scan dependencies, tests, CI and secrets.'}</p>
               ) : (
                 <ul className="findings">
                   {data.findings.map((f) => (

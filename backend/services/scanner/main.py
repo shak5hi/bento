@@ -80,7 +80,7 @@ class Scanner:
         try:
             sha = job.get("sha") or await resolve_head(url)
         except ScanError as exc:
-            await self.note(project, "scan", "Scan failed", f"Could not reach {url}: {exc}")
+            await self.fail(project, f"Could not reach {url}: {exc}")
             return
 
         # Claim the (project, commit) pair. Re-scan only if the earlier attempt failed or got stuck
@@ -122,7 +122,7 @@ class Scanner:
                 "UPDATE scans SET status = 'failed', error = $3, finished_at = now() WHERE project_id = $1 AND sha = $2",
                 project["id"], sha, str(exc),
             )
-            await self.note(project, "scan", "Scan failed", str(exc))
+            await self.fail(project, str(exc))
             return
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
@@ -154,8 +154,12 @@ class Scanner:
             await conn.execute(
                 "UPDATE scans SET status = 'done', finished_at = now() WHERE project_id = $1 AND sha = $2", project_id, sha)
             await conn.execute(
-                "UPDATE projects SET last_scan_at = now(), last_scan_sha = $2 WHERE id = $1", project_id, sha)
+                "UPDATE projects SET last_scan_at = now(), last_scan_sha = $2, last_scan_error = NULL WHERE id = $1", project_id, sha)
         return len(set(keys) - before), len(before - set(keys))
+
+    async def fail(self, project, reason: str) -> None:
+        await self.pg.execute("UPDATE projects SET last_scan_error = $2 WHERE id = $1", project["id"], reason)
+        await self.note(project, "scan", "Scan failed", reason)
 
     async def note(self, project, kind: str, title: str, body: str) -> None:
         await self.pg.execute(
