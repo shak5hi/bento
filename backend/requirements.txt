@@ -1,0 +1,6 @@
+# Unified backend dependencies for local development
+-r shared/requirements.txt
+-r services/api/requirements.txt
+-r services/notifier/requirements.txt
+-r services/prober/requirements.txt
+-r services/scanner/requirements.txt

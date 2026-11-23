@@ -14,9 +14,9 @@ docker compose up --build        # app on :8080, gateway on :8081
 ```
 CODE PIPELINE
   frontend ─┐
-  GitHub ───┴─► api-gateway ──► scan.jobs ──► scanner ──► postgres ──► advice.requests ──► advisor (Claude)
+  GitHub ───┴─► api-gateway ──► scan.jobs ──► scanner ──► postgres ──► advice.requests ──► advisor (Pickle)
                FastAPI · JWT     (stream)    sandboxed      projects,                       cached by findings
-               HMAC webhooks                 dedupe by SHA  findings                        hash · circuit breaker
+               HMAC webhooks                 dedupe by SHA  findings                        rule-based · cached
 
 PROBE PIPELINE
   scheduler ──► probe.jobs ──► probers ×N ──► probe.results ──► analyzer ──► timescaledb (hypertable)
@@ -33,7 +33,7 @@ PROBE PIPELINE
 | **analyzer** | Batches results into TimescaleDB, keeps an EWMA latency/error baseline per endpoint, opens an incident after 3 breaching probes (latency z > 3 and > 250 ms; errors ≥ 20 % and unusual, or ≥ 50 % regardless) and closes it after 3 normal ones. Computes the Engineering Health Score every minute. If TimescaleDB rejects writes, the batch stays in the stream — nothing is dropped. |
 | **notifier** | Turns alerts into in-app notifications (and Slack if configured). Repeats for an open incident are suppressed for 30 minutes. |
 | **scanner** | Fetches exactly one commit (shallow, no hooks, size cap, unprivileged, tmpfs) and runs static checks: committed `.env` files, missing tests / CI / README / lockfile, and known-vulnerable dependencies via [OSV](https://osv.dev). Repository code is never executed. GitHub's duplicate deliveries are skipped by commit SHA. |
-| **advisor** | "Pickle". Turns findings + incidents into ≤ 3 prioritised recommendations with Claude (`claude-opus-5-5`, structured output). Skips the call when the findings hash is unchanged. 5 consecutive failures open a circuit for 60 s; rule-based advice is served meanwhile. Works without an API key (rules only). |
+| **advisor** | "Pickle". Rule-based: ranks a project's live incidents and code findings by severity and writes a short brief plus ≤ 3 recommendations. Skips the work when the findings hash is unchanged. No external AI service is used. |
 
 **Data stores:** Postgres (users, projects, endpoints, scans, findings, incidents, advice, notifications) ·
 TimescaleDB (`probe_results`, `project_health` hypertables, retention policies) · Redis (streams, schedule, EWMA state, dedup keys, rate limits).
@@ -64,7 +64,6 @@ Interactive docs: http://localhost:8081/api/docs · Pipeline health: http://loca
 |---|---|
 | `JWT_SECRET` | signing key — **set it** anywhere shared |
 | `POSTGRES_PASSWORD` | database password for both Postgres and TimescaleDB |
-| `ANTHROPIC_API_KEY` | enables AI advice (otherwise rule-based) |
 | `GITHUB_WEBHOOK_SECRET` | enables `/api/webhooks/github`; use the same value in the GitHub webhook settings |
 | `SLACK_WEBHOOK_URL` | also send incident alerts to Slack |
 | `PROBER_REPLICAS` | number of prober workers (default 2) |
