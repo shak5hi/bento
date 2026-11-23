@@ -53,6 +53,8 @@ PLACEHOLDER = re.compile(
     r"test|todo|replace|insert|<|>|\$\{|\{\{|%\(|process\.env|os\.environ|getenv)"
 )
 GENERIC_ENTROPY = 3.5  # bits per character
+# a real key has base64 body text right after the header; docs only show a stub like "MIIE..."
+KEY_BODY = re.compile(r"[A-Za-z0-9+/=]{40,}")
 
 
 def entropy(s: str) -> float:
@@ -110,10 +112,15 @@ def secrets_in_code(root: Path, files: list[str]) -> list[dict]:
         text = _read_text(root / rel)
         if text is None:
             continue
-        for lineno, line in enumerate(text.splitlines(), 1):
+        lines = text.splitlines()
+        for lineno, line in enumerate(lines, 1):
             if len(line) > MAX_LINE_CHARS:
                 continue
             for rule, label, sev in _line_hits(line):
+                if rule == "private-key":
+                    after = " ".join([line.split("-----", 2)[-1], *lines[lineno:lineno + 2]])
+                    if not KEY_BODY.search(after):
+                        continue  # just the header, e.g. in documentation
                 entry = by_key.setdefault((rule, rel), {"label": label, "severity": sev, "lines": []})
                 entry["lines"].append(lineno)
 
