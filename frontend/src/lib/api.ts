@@ -125,6 +125,7 @@ export interface ProjectDetail {
     repoUrl: string | null;
     lastScanAt: string | null;
     lastScanSha: string | null;
+    lastScanError: string | null;
     health: number | null;
     status: Status;
     parts: { uptime: number | null; latency: number | null; errors: number | null; code: number; basis: string } | null;
