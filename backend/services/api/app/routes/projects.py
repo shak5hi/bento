@@ -61,8 +61,9 @@ def _check_endpoint(url: str) -> str:
     return url
 
 
-async def _queue_scan(project_id: UUID, reason: str) -> None:
-    await streams.publish(state.redis, streams.SCAN_JOBS, {"project_id": str(project_id), "sha": None, "delivery": reason})
+async def _queue_scan(project_id: UUID, reason: str, force: bool = False) -> None:
+    job = {"project_id": str(project_id), "sha": None, "delivery": reason} | ({"force": True} if force else {})
+    await streams.publish(state.redis, streams.SCAN_JOBS, job)
 
 
 def project_json(row, score=None) -> dict:
@@ -281,7 +282,7 @@ async def scan_now(project_id: UUID, user_id: UUID = Depends(current_user_id)):
     row = await owned_project(project_id, user_id)
     if not row["repo_url"]:
         raise HTTPException(422, "Add a repository URL to this project first")
-    await _queue_scan(project_id, "manual")
+    await _queue_scan(project_id, "manual", force=True)
     return {"queued": True}
 
 
