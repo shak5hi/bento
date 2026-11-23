@@ -61,11 +61,31 @@ apart and the food items settle into place as you scroll.
 - **GSAP** timelines and **Lenis** smooth scrolling, with shared scroll state in **Zustand**
 - Tailwind CSS v4, React Router 7, and login and dashboard pages
 
+## Command line and CI
+
+The same checks run locally and in other repositories' CI with the `bento` CLI. It only reads files and
+never runs your code:
+
+```bash
+pip install ./cli
+bento scan .                    # exits 1 on critical/high findings
+bento scan . --json --fail-on critical
+```
+
+```yaml
+- uses: shak5hi/bento@main      # GitHub Action
+  with: { fail-on: high }
+```
+
+Details: [`cli/README.md`](cli/README.md).
+
 ## Repository layout
 
 ```
 bento/
 ├── frontend/              React 19 + Vite + TypeScript: 3D landing, login, dashboard
+├── cli/                   `bento scan`: the scanner's checks on the command line (pip install ./cli)
+├── action.yml             GitHub Action that runs `bento scan`
 ├── backend/
 │   ├── docker-compose.yml the whole stack (13 containers)
 │   ├── services/
@@ -103,7 +123,8 @@ private repositories, create a GitHub App: see [Connect GitHub](backend/README.m
 - [x] Public status pages and README badges
 - [ ] Email alerts and a weekly digest
 - [x] Deeper scanning: secrets in code, outdated dependencies, Dockerfiles
-- [ ] Test suite and CI · `bento` CLI · hosted deployment
+- [x] `bento` CLI and GitHub Action
+- [ ] Test suite and CI · hosted deployment
 
 ## License
 
