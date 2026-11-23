@@ -3,6 +3,8 @@
 import os
 from contextlib import asynccontextmanager
 
+import httpx
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +16,7 @@ from bento_core.db import create_pool
 from bento_core.log import setup_logging
 
 from .migrations import migrate
-from .routes import auth, dashboard, projects, system, webhooks
+from .routes import auth, dashboard, github, projects, system, webhooks
 from .state import state
 
 log = setup_logging()
@@ -25,12 +27,14 @@ async def lifespan(_: FastAPI):
     state.pg = await create_pool(settings.database_url)
     state.ts = await create_pool(settings.timescale_url)
     state.redis = streams.connect()
+    state.http = httpx.AsyncClient(timeout=15)
     await migrate(state.pg, state.ts)
     log.info("api gateway ready")
     yield
     await state.pg.close()
     await state.ts.close()
     await state.redis.aclose()
+    await state.http.aclose()
 
 
 app = FastAPI(title="Bento API", version="2.0.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
@@ -52,5 +56,5 @@ async def validation_error(_: Request, exc: RequestValidationError):
     return JSONResponse(status_code=422, content={"detail": details[0]["message"] if details else "Invalid request", "errors": details})
 
 
-for router in (system.router, auth.router, projects.router, dashboard.router, webhooks.router):
+for router in (system.router, auth.router, github.router, projects.router, dashboard.router, webhooks.router):
     app.include_router(router)
