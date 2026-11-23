@@ -70,6 +70,28 @@ uptime, latency, incidents (hostname only) and the score: code findings and vuln
 
 Interactive docs: http://localhost:8081/api/docs · Pipeline health: http://localhost:8081/health/services
 
+## Tests
+
+```bash
+cd backend
+pip install -r tests/requirements.txt
+python -m pytest tests/unit          # ~150 tests, nothing needs to be running
+```
+
+Integration tests (`tests/integration`) drive the real API against Postgres, TimescaleDB and Redis. They only
+ever use the `bento_test` / `metrics_test` databases and Redis DB 15, and are skipped when the services aren't
+reachable. To run them against throwaway containers (no passwords):
+
+```bash
+docker run -d --name t-pg    -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:16-alpine
+docker run -d --name t-ts    -p 5433:5432 -e POSTGRES_HOST_AUTH_METHOD=trust timescale/timescaledb:2.17.2-pg16
+docker run -d --name t-redis -p 6379:6379 redis:7-alpine
+DATABASE_URL=postgresql://postgres@localhost:5432/bento TIMESCALE_URL=postgresql://postgres@localhost:5433/metrics REDIS_URL=redis://localhost:6379/0 python -m pytest
+```
+
+CI (`.github/workflows/tests.yml`) runs all of it on every push and pull request, plus `bento scan` on this
+repository, the frontend lint/typecheck/build and a `docker compose build`.
+
 ## Configuration (`.env`, all optional in development)
 
 | Variable | Purpose |
