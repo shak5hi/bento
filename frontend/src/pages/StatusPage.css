@@ -1,0 +1,65 @@
+/* Public status page: the dashboard's paper, hairlines and status colours, in one calm column. */
+
+.sp-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: clamp(28px, 6vw, 64px) clamp(16px, 4vw, 32px) 64px;
+}
+
+.sp-title { margin: 0; font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 300; letter-spacing: -0.04em; line-height: 1.05; }
+.sp-h { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+.sp-card .d-head .sp-h { margin: 0; }
+
+.sp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: end;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.sp-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 99px;
+}
+.sp-banner::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sp-banner.is-ok { color: var(--ok); background: var(--ok-soft); }
+.sp-banner.is-live { color: var(--crit); background: var(--crit-soft); }
+.sp-banner.is-wait { color: var(--ink-3); background: var(--paper-2); }
+
+.sp-score { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.sp-score-num { font-size: 4.2rem; font-weight: 300; line-height: 0.9; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
+
+.sp-card { padding: 20px 22px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.sp-card .rows { margin-top: 0; }
+.sp-card .row:last-child { border-bottom: 0; padding-bottom: 0; }
+.sp-empty { margin: 0; }
+
+.sp-uptime { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 0; }
+.sp-uptime div { display: flex; flex-direction: column; gap: 4px; padding-left: 14px; border-left: 1px solid var(--line); }
+.sp-uptime div:first-child { padding-left: 0; border-left: 0; }
+.sp-uptime dt { font-size: 12px; color: var(--muted); }
+.sp-uptime dd { margin: 0; font-size: 1.6rem; font-weight: 400; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+
+.sp-foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.sp-foot a { color: var(--ink-3); }
+
+.sp-missing { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 40px 0; }
+.sp-missing p { margin: 0; }
+
+@media (max-width: 560px) {
+  .sp-hero { grid-template-columns: 1fr; }
+  .sp-score { align-items: flex-start; }
+  .sp-uptime dd { font-size: 1.25rem; }
+}
+.sp-card .sev { text-transform: none; }

@@ -126,6 +126,8 @@ export interface ProjectDetail {
     lastScanAt: string | null;
     lastScanSha: string | null;
     lastScanError: string | null;
+    isPublic: boolean;
+    publicSlug: string | null;
     health: number | null;
     status: Status;
     parts: { uptime: number | null; latency: number | null; errors: number | null; code: number; basis: string } | null;
@@ -149,6 +151,20 @@ export interface LatencyPoint {
   p95: number | null;
   failures: number;
   total: number;
+}
+
+/** GET /public/status/:slug — no findings or vulnerability details, by design. */
+export interface PublicStatus {
+  name: string;
+  health: number | null;
+  status: Status;
+  basis: 'full' | 'code' | null;
+  updatedAt: string | null;
+  monitoredEndpoints: number;
+  uptime: { '24h': number | null; '7d': number | null; '30d': number | null };
+  latency: { t: string; p95: number | null }[];
+  openIncidents: { kind: 'latency' | 'errors'; host: string; openedAt: string }[];
+  resolvedIncidents: { kind: 'latency' | 'errors'; host: string; openedAt: string; closedAt: string }[];
 }
 
 export interface SystemHealth {

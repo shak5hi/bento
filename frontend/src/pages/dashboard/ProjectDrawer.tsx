@@ -92,7 +92,20 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
     return () => window.clearTimeout(id);
   }, [toast]);
 
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast(`${what} copied.`);
+    } catch {
+      setError('Could not copy. Select the text and copy it yourself.');
+    }
+  };
+
   const p = data?.project;
+  const origin = window.location.origin;
+  const publicUrl = p?.publicSlug ? `${origin}/status/${p.publicSlug}` : null;
+  const badgeUrl = p?.publicSlug ? `${origin}/api/badge/${p.publicSlug}.svg` : null;
+  const badgeMarkdown = publicUrl && badgeUrl ? `[![Bento health](${badgeUrl})](${publicUrl})` : '';
   const openIncidents = data?.incidents.filter((i) => i.status === 'open') ?? [];
   const pastIncidents = data?.incidents.filter((i) => i.status === 'closed').slice(0, 5) ?? [];
 
@@ -261,6 +274,49 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
                 </ul>
               </section>
             )}
+
+            <section className="d-section">
+              <div className="d-head">
+                <h3 id="public-label">Public status page</h3>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={p.isPublic}
+                  aria-labelledby="public-label"
+                  className={`switch${p.isPublic ? ' on' : ''}`}
+                  disabled={busy === 'public'}
+                  onClick={() =>
+                    run(
+                      'public',
+                      () => api(`/projects/${projectId}/public`, { method: 'PUT', body: { enabled: !p.isPublic } }),
+                      p.isPublic ? 'Status page is private again.' : 'Status page is public.',
+                    )
+                  }
+                >
+                  <span />
+                </button>
+              </div>
+              <p className="muted small public-note">
+                {p.isPublic
+                  ? 'Anyone with the link sees the health score, uptime, latency and incidents. Code findings always stay private.'
+                  : 'Off. Turn it on to share uptime, latency and incidents, and to get a README badge. Code findings are never shown.'}
+              </p>
+              {publicUrl && badgeUrl && (
+                <div className="public-share">
+                  <label className="share-row">
+                    <span className="label">Page</span>
+                    <input readOnly value={publicUrl} onFocus={(e) => e.target.select()} />
+                    <a className="btn" href={publicUrl} target="_blank" rel="noreferrer">Open ↗</a>
+                  </label>
+                  <label className="share-row">
+                    <span className="label">Badge</span>
+                    <input readOnly value={badgeMarkdown} onFocus={(e) => e.target.select()} />
+                    <button type="button" className="btn" onClick={() => copy(badgeMarkdown, 'Badge Markdown')}>Copy</button>
+                  </label>
+                  <img className="badge-preview" src={badgeUrl} alt={`Bento health badge for ${p.name}`} height={20} />
+                </div>
+              )}
+            </section>
 
             <footer className="drawer-foot">
               {p.repoUrl && (
