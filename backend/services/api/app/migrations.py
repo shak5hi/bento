@@ -117,6 +117,25 @@ CREATE INDEX IF NOT EXISTS notifications_owner_idx ON notifications (owner_id, c
 
 -- Why the most recent scan attempt failed (NULL after a successful scan)
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS last_scan_error TEXT;
+
+-- GitHub: accounts created via "Sign in with GitHub" have no password
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_id BIGINT UNIQUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_login TEXT;
+
+-- Installations of the Bento GitHub App a user has access to (an org install can be shared)
+CREATE TABLE IF NOT EXISTS github_installations (
+  id            BIGINT NOT NULL,
+  owner_id      UUID   NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  account_login TEXT   NOT NULL,
+  account_type  TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (id, owner_id)
+);
+
+-- Projects imported through the app are cloned with an installation token (private repos work)
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS installation_id BIGINT;
+CREATE INDEX IF NOT EXISTS projects_installation_idx ON projects (installation_id);
 """
 
 TIMESCALE = """
