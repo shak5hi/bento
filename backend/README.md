@@ -100,7 +100,8 @@ settings Bento still works with public repository URLs.
    | ☑ Request user authorization (OAuth) during installation | checked |
    | Setup URL | `<PUBLIC_URL>/api/auth/github/callback`, ☑ Redirect on update |
    | Webhook | ☑ Active, URL `https://<public-host>/api/webhooks/github`, secret = a long random string |
-2. **Permissions** - Repository: *Contents* read & write, *Pull requests* read & write, *Checks* read & write,
+2. **Permissions** - Repository: *Contents* read & write, *Pull requests* read & write, *Workflows* read & write
+   (needed to add CI files), *Checks* read & write,
    *Metadata* read. Account: *Email addresses* read.
    (Write access is used by PR checks and auto-fix pull requests; scanning only reads.)
 3. **Subscribe to events**: *Push*, *Pull request*.

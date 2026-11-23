@@ -79,7 +79,16 @@ class Fixer:
         base_sha = await repo.head(base)
         files = await repo.tree(base_sha)
         fix = await self.build(repo, key, base_sha, files, info)
-        await repo.commit_to_new_branch(branch, base_sha, f"{fix.message}\n\nOpened by Bento for finding {key}.", fix.changes)
+        try:
+            await repo.commit_to_new_branch(branch, base_sha, f"{fix.message}\n\nOpened by Bento for finding {key}.", fix.changes)
+        except FixError as exc:
+            if "403" in str(exc) and any(p.startswith(".github/workflows/") for p in fix.changes):
+                raise FixError(
+                    "GitHub only lets apps add CI files with the Workflows permission. In your GitHub App's settings, "
+                    "set Repository permissions → Workflows to Read and write, save, then accept the new permission "
+                    "on the installation and try again."
+                ) from None
+            raise
         pr = await repo.open_pr(branch, base, f"Bento: {fix.title}", fix.body)
         return branch, pr
 
