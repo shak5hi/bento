@@ -44,7 +44,9 @@ PROBE PIPELINE
    missing tests, CI, README or lockfile. Repository code is never executed and secret values are never stored.
 3. **Probe.** Live sites are checked every minute. The analyzer learns each endpoint's normal latency and
    error rate (EWMA) and opens an incident after 3 abnormal checks in a row.
-4. **Score.** `Uptime 40 + Latency 20 + Errors 20 + Code 20`, recomputed every minute.
+4. **Grade.** Four report cards (**Security**, **Website**, **Code basics** and **Upkeep**) roll up into one
+   0–100 score and an A–F grade. A leaked secret caps the grade, anything not measured says so, and every
+   project shows the one fix that would raise its score most.
 5. **Explain.** Pickle ranks incidents and findings by severity and writes a brief plus at most three
    recommendations. It is rule-based: no external AI service.
 
