@@ -37,15 +37,19 @@ def local_checks(root: Path, files: list[str]) -> list[dict]:
     return hygiene(files) + secrets_in_code(root, files) + dockerfiles(root, files)
 
 
-async def network_checks(root: Path, http: httpx.AsyncClient, cache) -> list[dict]:
+async def network_checks(root: Path, http: httpx.AsyncClient, cache, facts: dict | None = None) -> list[dict]:
     """Checks that look dependencies up online: OSV advisories and registry versions."""
-    vulns, old = await asyncio.gather(vulnerabilities(root, http), outdated(root, http, cache))
+    vulns, old = await asyncio.gather(vulnerabilities(root, http), outdated(root, http, cache, facts))
     return vulns + old
 
 
-async def run_checks(root: Path, files: list[str], http: httpx.AsyncClient | None, cache=None) -> list[dict]:
-    """All checks, worst first. Pass http=None to stay offline."""
+async def run_checks(
+    root: Path, files: list[str], http: httpx.AsyncClient | None, cache=None, facts: dict | None = None
+) -> list[dict]:
+    """All checks, worst first. Pass http=None to stay offline. `facts` collects raw scan facts."""
+    if facts is not None:
+        facts["files"] = len(files)
     found = await asyncio.to_thread(local_checks, root, files)  # file reads are blocking
     if http is not None:
-        found += await network_checks(root, http, cache or MemoryCache())
+        found += await network_checks(root, http, cache or MemoryCache(), facts)
     return sorted(found, key=lambda f: SEVERITIES.index(f["severity"]))

@@ -94,14 +94,17 @@ async def _latest(eco: str, name: str, http: httpx.AsyncClient, cache, sem: asyn
     return latest
 
 
-async def outdated(root: Path, http: httpx.AsyncClient, cache) -> list[dict]:
-    """cache: anything with async get(key) / set(key, value, ex=seconds), e.g. a Redis client."""
+async def outdated(root: Path, http: httpx.AsyncClient, cache, facts: dict | None = None) -> list[dict]:
+    """cache: anything with async get(key) / set(key, value, ex=seconds), e.g. a Redis client.
+    facts: if given, gets {"deps_checked": {ecosystem: n}} so scores can say "35 of 40 up to date"."""
     sem = asyncio.Semaphore(CONCURRENCY)
     out = []
     for eco, pkgs in (("npm", npm_direct(root)), ("PyPI", _pypi_packages(root))):
         items = list(pkgs.items())[:MAX_PACKAGES]
         if not items:
             continue
+        if facts is not None:
+            facts.setdefault("deps_checked", {})[eco] = len(items)
         latest = await asyncio.gather(*(_latest(eco, n, http, cache, sem) for n, _ in items))
         behind = []
         for (name, current), new in zip(items, latest):
@@ -117,10 +120,10 @@ async def outdated(root: Path, http: httpx.AsyncClient, cache) -> list[dict]:
         worst = behind[0][0]
         listed = ", ".join(f"{n} {c} → {l}" for _, n, c, l in behind[:8]) + ("…" if len(behind) > 8 else "")
         count = len(behind)
-        out.append(finding(
+        out.append({**finding(
             f"outdated:{eco}", "medium" if worst >= 2 else "low",
             f"{count} {eco} package{'s are' if count > 1 else ' is'} a major version or more behind",
             f"{listed}. Major upgrades can include breaking changes: read the changelogs and upgrade one at a time.",
             min(240, 30 * count),
-        ))
+        ), "meta": {"behind": count, "checked": len(items)}})
     return out
