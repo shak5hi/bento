@@ -123,6 +123,11 @@ services:
     environment: *env
     tmpfs: ["/tmp:size=1g"] # clones live in RAM-backed scratch space and vanish on restart
 
+  fixer: # auto-fix pull requests via the GitHub API (never pushes to the default branch)
+    <<: *worker
+    build: { context: ., dockerfile: docker/python.Dockerfile, args: { SERVICE: fixer } }
+    environment: *env
+
   advisor:
     <<: *worker
     build: { context: ., dockerfile: docker/python.Dockerfile, args: { SERVICE: advisor } }

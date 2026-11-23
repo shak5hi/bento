@@ -12,13 +12,14 @@ from ..state import state
 
 router = APIRouter(tags=["system"])
 
-WORKERS = ["scheduler", "prober", "analyzer", "notifier", "scanner", "advisor"]
+WORKERS = ["scheduler", "prober", "analyzer", "notifier", "scanner", "advisor", "fixer"]
 QUEUES = {
     streams.PROBE_JOBS: "probers",
     streams.PROBE_RESULTS: "analyzer",
     streams.ALERTS: "notifier",
     streams.SCAN_JOBS: "scanner",
     streams.ADVICE_REQUESTS: "advisor",
+    streams.FIX_JOBS: "fixer",
 }
 
 
