@@ -1,124 +1,133 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useGLTF, useAnimations, useTexture } from '@react-three/drei';
-import { useFrame, createPortal } from '@react-three/fiber';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { ContactShadows, useGLTF, useTexture } from '@react-three/drei';
+import { createPortal, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { heroScroll } from '../scrollState';
-import { FoodItems } from './FoodItems';
+import { COMPARTMENTS, compartmentTargets } from '../scene3d';
+import { FLOOR, FoodItems } from '../food/Foods';
 import logoSrc from '../../assets/lightlogo.png';
 
-
-/**
- * BentoModel — loads bento.glb and scrubs the Blender lid animation via scroll.
- *
- * Rules:
- * - Do NOT modify geometry, materials, or GLB hierarchy.
- * - Scale is always uniform (scalar, not array).
- * - Animation scale tracks stripped to prevent non-uniform deformation.
- * - Lid starts closed at frame 0. Animation plays only as the user scrolls.
+/*
+ * Lid choreography (scene-local units, driven by heroScroll.rawProgress 0 → 1):
+ *   unseal  — lifts straight up off the rim
+ *   arc     — rises, swings over to the right while tilting like a page turning
+ *   land    — comes down flat on the table beside the box, with a soft settle
+ * A smooth spline + easing replaces the linear Blender clip, so it reads as one motion
+ * and plays back identically when the lid closes again.
  */
+const LOGO_ASPECT = 1441 / 388; // lightlogo.png
+const LID_REST_Y = 0.082;
+const TABLE_Y = -0.582; // underside of the tray
+const LID_HALF_THICKNESS = 0.089;
+const LID_LAND = new THREE.Vector3(4.45, TABLE_Y + LID_HALF_THICKNESS, -0.12);
+
+const lidPath = new THREE.CatmullRomCurve3(
+  [
+    new THREE.Vector3(0, LID_REST_Y, 0),
+    new THREE.Vector3(0.02, 0.62, 0.02),
+    new THREE.Vector3(1.5, 1.7, -0.05),
+    new THREE.Vector3(3.55, 1.25, -0.12),
+    new THREE.Vector3(4.4, 0.05, -0.12),
+    LID_LAND,
+  ],
+  false,
+  'centripetal',
+);
+
+const smootherstep = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+const bump = (t: number, a: number, b: number) => {
+  const u = clamp01((t - a) / (b - a));
+  return Math.sin(u * Math.PI);
+};
+
+const _q = new THREE.Quaternion();
+const _e = new THREE.Euler();
+
 export function BentoModel() {
-  const group = useRef<THREE.Group>(null);
-  const { scene, animations } = useGLTF('/models/bento.glb');
+  const { scene } = useGLTF('/models/bento.glb');
   const logoTexture = useTexture(logoSrc);
+  const lidRef = useRef<THREE.Object3D | null>(null);
+  const trayRef = useRef<THREE.Object3D | null>(null);
 
-  // Memoised: strip scale tracks so the animation can never non-uniformly deform the model.
-  // Without useMemo this runs every render, causing useAnimations to re-bind on every frame.
-  const cleanedAnimations = useMemo(
-    () =>
-      animations.map((clip) => {
-        const clone = clip.clone();
-        clone.tracks = clone.tracks.filter((t) => !t.name.endsWith('.scale'));
-        return clone;
-      }),
-    [animations]
-  );
-
-  const { actions, mixer, names } = useAnimations(cleanedAnimations, group);
-
-  // We no longer need local ref for scrub, we read heroScroll directly in useFrame.
-  // Use MeshStandardMaterial so lighting gives proper 3D depth.
-  // Colors: tray = #762C0B (deep terracotta), lid = #2d2d2d (charcoal).
-  useEffect(() => {
-    const TRAY_MAT = new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#762C0B'),
-      roughness: 0.65,
-      metalness: 0.05,
-    });
-    const LID_MAT = new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#2d2d2d'),
-      roughness: 0.45,
-      metalness: 0.05,
-    });
-
+  // Captured before the food is portalled into the tray, so materials only touch Blender's meshes.
+  const { lid, tray, boxMeshes } = useMemo(() => {
+    let lid: THREE.Object3D | null = null;
+    let tray: THREE.Object3D | null = null;
+    const boxMeshes: THREE.Mesh[] = [];
     scene.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-      if (!mesh.isMesh) return;
-
-      // Protect the food items from being painted with the tray material
-      if (mesh.name.toLowerCase().includes('food')) return;
-
-      const isLid = mesh.name.toLowerCase().includes('lid') ||
-                    child.parent?.name.toLowerCase().includes('lid');
-
-      mesh.material = isLid ? LID_MAT : TRAY_MAT;
-      mesh.frustumCulled = false;
+      const n = child.name.toLowerCase();
+      if (n === 'lid') lid = child;
+      if (n === 'trey' || n === 'tray') tray = child;
+      if ((child as THREE.Mesh).isMesh) boxMeshes.push(child as THREE.Mesh);
     });
+    return { lid: lid as THREE.Object3D | null, tray: tray as THREE.Object3D | null, boxMeshes };
   }, [scene]);
 
-  // Connect Blender animation to our scroll state (0 -> 1 progress maps to 0 -> clip.duration)
+  // Lacquerware: deep red tray, near-black lid, both with a clear lacquer coat.
   useEffect(() => {
-    if (!names.length) return;
-    const action = actions[names[0]];
-    if (!action) return;
-
-    action.play();
-    action.paused = true;
-    mixer.setTime(0);
-  }, [actions, names, mixer]);
-
-  // Every frame: apply the shared scroll progress to the action time
-  useFrame(() => {
-    const action = names.length ? actions[names[0]] : null;
-    if (action) {
-      action.time = heroScroll.rawProgress * action.getClip().duration;
+    const trayMat = new THREE.MeshPhysicalMaterial({ color: '#6e1f08', roughness: 0.5, clearcoat: 0.55, clearcoatRoughness: 0.3, envMapIntensity: 0.55 });
+    const lidMat = new THREE.MeshPhysicalMaterial({ color: '#1b1917', roughness: 0.34, clearcoat: 1, clearcoatRoughness: 0.14, envMapIntensity: 0.8 });
+    for (const mesh of boxMeshes) {
+      const isLid = mesh === lid || mesh.parent === lid;
+      mesh.material = isLid ? lidMat : trayMat;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
     }
-  });
-  const treyNode = useMemo(() => {
-    let found = null;
-    scene.traverse((child) => {
-      if (child.name.toLowerCase().includes('trey') || child.name.toLowerCase().includes('tray')) {
-        found = child;
-      }
-    });
-    return found || scene;
-  }, [scene]);
+    lidRef.current = lid;
+    trayRef.current = tray;
+    return () => {
+      trayMat.dispose();
+      lidMat.dispose();
+    };
+  }, [boxMeshes, lid, tray]);
 
-  const lidNode = useMemo(() => {
-    let found: THREE.Object3D | null = null;
-    scene.traverse((child) => {
-      if (child.name.toLowerCase().includes('lid')) {
-        found = child;
-      }
+  // Publish where each compartment is in world space, for the camera's close-ups.
+  const groupRef = useRef<THREE.Group>(null);
+  useLayoutEffect(() => {
+    if (!tray || !groupRef.current) return;
+    groupRef.current.updateWorldMatrix(true, true);
+    const scale = new THREE.Vector3();
+    tray.getWorldScale(scale);
+    COMPARTMENTS.forEach((c, i) => {
+      compartmentTargets[i].center.set(c.x, FLOOR + 0.16, c.z);
+      tray.localToWorld(compartmentTargets[i].center);
+      compartmentTargets[i].size = Math.max(c.w, c.d) * scale.x;
     });
-    return found;
-  }, [scene]);
+  }, [tray]);
+
+  useFrame(() => {
+    const lidObj = lidRef.current;
+    if (!lidObj) return;
+    const p = clamp01(heroScroll.rawProgress);
+    const t = smootherstep(p);
+
+    lidObj.position.copy(lidPath.getPoint(t));
+    // settle: a small, fast-decaying bounce as it touches down
+    const land = clamp01((p - 0.9) / 0.1);
+    if (land > 0) lidObj.position.y += Math.sin(land * Math.PI) * 0.035 * (1 - land);
+
+    const tiltZ = -0.62 * bump(t, 0.12, 0.92); // page-turn tilt toward the landing side
+    const tiltX = 0.08 * bump(t, 0.2, 0.75); // a breath of lift at the near edge
+    const yaw = -0.16 * smootherstep(clamp01((t - 0.35) / 0.65)); // comes to rest slightly turned
+    _e.set(tiltX, yaw, tiltZ, 'YXZ');
+    lidObj.quaternion.copy(_q.setFromEuler(_e));
+  });
 
   return (
-    <group ref={group} position={[0, 0.8, 0]} rotation={[0, Math.PI / 6, 0]} scale={1.8}>
+    <group ref={groupRef} position={[0, 0.8, 0]} rotation={[0, Math.PI / 6, 0]} scale={1.8}>
       <primitive object={scene} />
-      {treyNode && createPortal(<FoodItems />, treyNode)}
-      {lidNode && createPortal(
-        <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[2, 2]} />
-          <meshStandardMaterial 
-            map={logoTexture} 
-            transparent 
-            side={THREE.DoubleSide}
-            depthTest={false} 
-          />
-        </mesh>,
-        lidNode
-      )}
+      {tray && createPortal(<FoodItems />, tray)}
+      {lid &&
+        createPortal(
+          // The logo PNG is white-on-black: use it as an alpha mask so only the lettering is printed.
+          <mesh position={[0, 0.0875, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+            <planeGeometry args={[1.7, 1.7 / LOGO_ASPECT]} />
+            <meshStandardMaterial color="#e9e1d4" alphaMap={logoTexture} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} roughness={0.55} />
+          </mesh>,
+          lid,
+        )}
+      <ContactShadows position={[1.4, TABLE_Y - 0.002, 0]} width={13} height={8} scale={[13, 8]} resolution={512} blur={2.6} opacity={0.5} far={2.2} color="#3a0f00" />
     </group>
   );
 }
