@@ -1,23 +1,38 @@
 import { useEffect, useRef, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { AnimationController } from './experience/animations/AnimationController';
-import { BentoModel } from './experience/models/BentoModel';
+import { Environment, Lightformer } from '@react-three/drei';
 import * as THREE from 'three';
-import logoSrc from './assets/logo.png';
-import zoom1Img from './assets/compartmentzoom1.svg';
-import zoom2Img from './assets/compartmentzoom2.svg';
-import zoom3Img from './assets/Compartment3.svg';
-import zoom4Img from './assets/compartmentzoom4.svg';
-import zoom5Img from './assets/Compartment5.svg';
-import mockDashboardImg from './assets/mockdashboard.png';
-import './HeroLayout.css';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useNavigate } from 'react-router-dom';
+import { AnimationController } from './experience/animations/AnimationController';
+import { BentoModel } from './experience/models/BentoModel';
 import { heroScroll } from './experience/scrollState';
+import { DashboardPreview } from './landing/DashboardPreview';
+import { LandingNav, LandingSections } from './landing/Sections';
 import { auth } from './lib/api';
+import './HeroLayout.css';
+import './landing/Landing.css';
 
 gsap.registerPlugin(ScrollTrigger);
+
+type ZoomKey = 'comp1ZoomProgress' | 'zoomProgress' | 'comp3ZoomProgress' | 'comp4ZoomProgress' | 'comp5ZoomProgress';
+
+/** The five chapters of the scroll story, one per compartment (camera framing in AnimationController). */
+const CHAPTERS: { zoom: ZoomKey; eyebrow: string; title: React.ReactNode; body: string; side: 'l' | 'r' }[] = [
+  { zoom: 'comp1ZoomProgress', eyebrow: '01 · Balance', title: <>Every bento needs <b>balance.</b></>, body: 'Every engineering portfolio does too. Pickle quietly brings together signals from every project and turns them into calm, actionable guidance.', side: 'r' },
+  { zoom: 'zoomProgress', eyebrow: '02 · Habit', title: <>Healthy projects are <b>built daily.</b></>, body: 'Bento helps you make steady progress by focusing on the work that matters most — three things today, not fifty alerts.', side: 'l' },
+  { zoom: 'comp3ZoomProgress', eyebrow: '03 · Health', title: <>See beyond <b>the code.</b></>, body: 'Every project receives a living Engineering Health Score: a picture of its quality, not just its activity.', side: 'r' },
+  { zoom: 'comp4ZoomProgress', eyebrow: '04 · Everything', title: <>Bring everything <b>to the table.</b></>, body: 'Bento gathers every project into one place, giving you a complete view of your engineering world.', side: 'l' },
+  { zoom: 'comp5ZoomProgress', eyebrow: '05 · Signal', title: <>Every signal tells <b>a story.</b></>, body: 'Bento brings them together into clear recommendations you can actually act on.', side: 'r' },
+];
+
+// Timeline (abstract units across the 800vh pin)
+const OPEN_AT = 50;
+const OPEN_FOR = 70; // the lid takes its time
+const CHAPTER_AT = OPEN_AT + OPEN_FOR + 10;
+const CHAPTER_EVERY = 100;
+const CLOSE_AT = CHAPTER_AT + CHAPTERS.length * CHAPTER_EVERY;
 
 function BentoHero() {
   const navigate = useNavigate();
@@ -26,21 +41,12 @@ function BentoHero() {
   const rightColRef = useRef<HTMLDivElement>(null);
   const scrollHintRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  
   const finalTextLeftRef = useRef<HTMLDivElement>(null);
   const finalTextRightRef = useRef<HTMLDivElement>(null);
-  const mockDashboardRef = useRef<HTMLImageElement>(null);
-  
-  const zoom1Ref = useRef<HTMLImageElement>(null);
-  const zoom1TextRef = useRef<HTMLDivElement>(null);
-  const zoom2Ref = useRef<HTMLImageElement>(null);
-  const zoomTextRef = useRef<HTMLDivElement>(null);
-  const zoom3Ref = useRef<HTMLImageElement>(null);
-  const zoom3TextRef = useRef<HTMLDivElement>(null);
-  const zoom4Ref = useRef<HTMLImageElement>(null);
-  const zoom4TextRef = useRef<HTMLDivElement>(null);
-  const zoom5Ref = useRef<HTMLImageElement>(null);
-  const zoom5TextRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const chapterRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const scrimLRef = useRef<HTMLDivElement>(null);
+  const scrimRRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current || !leftColRef.current || !rightColRef.current) return;
@@ -53,19 +59,17 @@ function BentoHero() {
           end: 'bottom bottom',
           scrub: 2.5,
           invalidateOnRefresh: true,
-        }
+        },
       });
 
       tl.to({}, { duration: 1400 });
 
-      tl.to([leftColRef.current, scrollHintRef.current], {
-        xPercent: -80, opacity: 0, ease: 'power2.inOut', duration: 10
-      }, 10);
+      tl.to([leftColRef.current, scrollHintRef.current], { xPercent: -80, opacity: 0, ease: 'power2.inOut', duration: 10 }, 10);
 
       const camProxy = { progress: 0 };
       tl.to(camProxy, {
         progress: 1, ease: 'power3.inOut', duration: 28,
-        onUpdate: () => { heroScroll.cameraProgress = camProxy.progress; }
+        onUpdate: () => { heroScroll.cameraProgress = camProxy.progress; },
       }, 20);
 
       tl.to(rightColRef.current, {
@@ -73,97 +77,46 @@ function BentoHero() {
           const parent = rightColRef.current!.parentElement;
           if (!parent) return 0;
           const style = window.getComputedStyle(parent);
-          const paddingLeft = parseFloat(style.paddingLeft) || 0;
-          const paddingRight = parseFloat(style.paddingRight) || 0;
-          const contentWidth = parent.getBoundingClientRect().width - paddingLeft - paddingRight;
+          const contentWidth = parent.getBoundingClientRect().width - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
           return -0.26 * contentWidth;
         },
-        ease: 'power3.inOut', duration: 28
+        ease: 'power3.inOut', duration: 28,
       }, 20);
 
-      const proxy = { progress: 0 };
-      tl.to(proxy, {
-        progress: 1, ease: 'none', duration: 50,
-        onUpdate: () => { heroScroll.rawProgress = proxy.progress; }
-      }, 50);
+      // Lid opens (easing lives in BentoModel / AnimationController, so keep this linear)
+      const open = { progress: 0 };
+      tl.to(open, { progress: 1, ease: 'none', duration: OPEN_FOR, onUpdate: () => { heroScroll.rawProgress = open.progress; } }, OPEN_AT);
 
-      // --- COMPARTMENT 1 ---
-      const zs1 = { p: 0 };
-      tl.to(zs1, { p: 1, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp1ZoomProgress = zs1.p }, 110);
-      tl.to(overlayRef.current, { opacity: 1, ease: 'power2.inOut', duration: 5 }, 130);
-      tl.to([zoom1Ref.current, zoom1TextRef.current], { opacity: 1, y: 0, ease: 'power3.out', duration: 15 }, 135);
-      tl.to([zoom1Ref.current, zoom1TextRef.current], { opacity: 0, y: 50, ease: 'power3.in', duration: 10 }, 170);
-      tl.to(overlayRef.current, { opacity: 0, ease: 'power3.inOut', duration: 15 }, 170);
-      tl.to(zs1, { p: 0, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp1ZoomProgress = zs1.p }, 170);
+      // Chapters: camera pushes into a compartment, its story fades in, then pulls back out.
+      CHAPTERS.forEach((ch, i) => {
+        const at = CHAPTER_AT + i * CHAPTER_EVERY;
+        const z = { p: 0 };
+        const text = chapterRefs.current[i];
+        const scrim = ch.side === 'l' ? scrimLRef.current : scrimRRef.current;
+        tl.to(z, { p: 1, ease: 'power3.inOut', duration: 30, onUpdate: () => { heroScroll[ch.zoom] = z.p; } }, at);
+        tl.to(overlayRef.current, { opacity: 1, ease: 'power2.inOut', duration: 8 }, at + 18);
+        tl.to(scrim, { opacity: 1, ease: 'power2.out', duration: 14 }, at + 20);
+        tl.to(text, { opacity: 1, y: 0, ease: 'power3.out', duration: 15 }, at + 25);
+        tl.to(text, { opacity: 0, y: 40, ease: 'power3.in', duration: 10 }, at + 60);
+        tl.to(scrim, { opacity: 0, ease: 'power2.in', duration: 12 }, at + 60);
+        tl.to(overlayRef.current, { opacity: 0, ease: 'power3.inOut', duration: 15 }, at + 60);
+        tl.to(z, { p: 0, ease: 'power3.inOut', duration: 30, onUpdate: () => { heroScroll[ch.zoom] = z.p; } }, at + 60);
+      });
 
-      // --- COMPARTMENT 2 ---
-      const zs2 = { p: 0 };
-      tl.to(zs2, { p: 1, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.zoomProgress = zs2.p }, 210);
-      tl.to(overlayRef.current, { opacity: 1, ease: 'power2.inOut', duration: 5 }, 230);
-      tl.to([zoom2Ref.current, zoomTextRef.current], { opacity: 1, y: 0, ease: 'power3.out', duration: 15 }, 235);
-      tl.to([zoom2Ref.current, zoomTextRef.current], { opacity: 0, y: 50, ease: 'power3.in', duration: 10 }, 270);
-      tl.to(overlayRef.current, { opacity: 0, ease: 'power3.inOut', duration: 15 }, 270);
-      tl.to(zs2, { p: 0, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.zoomProgress = zs2.p }, 270);
+      // Lid goes back on
+      const close = { progress: 1 };
+      tl.to(close, { progress: 0, ease: 'none', duration: 120, onUpdate: () => { heroScroll.rawProgress = close.progress; } }, CLOSE_AT);
 
-      // --- COMPARTMENT 3 ---
-      const zs3 = { p: 0 };
-      tl.to(zs3, { p: 1, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp3ZoomProgress = zs3.p }, 310);
-      tl.to(overlayRef.current, { opacity: 1, ease: 'power2.inOut', duration: 5 }, 330);
-      tl.to([zoom3Ref.current, zoom3TextRef.current], { opacity: 1, y: 0, ease: 'power3.out', duration: 15 }, 335);
-      tl.to([zoom3Ref.current, zoom3TextRef.current], { opacity: 0, y: 50, ease: 'power3.in', duration: 10 }, 370);
-      tl.to(overlayRef.current, { opacity: 0, ease: 'power3.inOut', duration: 15 }, 370);
-      tl.to(zs3, { p: 0, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp3ZoomProgress = zs3.p }, 370);
+      tl.fromTo(finalTextLeftRef.current, { x: -300, opacity: 0 }, { x: 0, opacity: 1, ease: 'power2.out', duration: 150 }, CLOSE_AT + 120);
+      tl.fromTo(finalTextRightRef.current, { x: 300, opacity: 0 }, { x: 0, opacity: 1, ease: 'power2.out', duration: 150 }, CLOSE_AT + 120);
 
-      // --- COMPARTMENT 4 ---
-      const zs4 = { p: 0 };
-      tl.to(zs4, { p: 1, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp4ZoomProgress = zs4.p }, 410);
-      tl.to(overlayRef.current, { opacity: 1, ease: 'power2.inOut', duration: 5 }, 430);
-      tl.to([zoom4Ref.current, zoom4TextRef.current], { opacity: 1, y: 0, ease: 'power3.out', duration: 15 }, 435);
-      tl.to([zoom4Ref.current, zoom4TextRef.current], { opacity: 0, y: 50, ease: 'power3.in', duration: 10 }, 470);
-      tl.to(overlayRef.current, { opacity: 0, ease: 'power3.inOut', duration: 15 }, 470);
-      tl.to(zs4, { p: 0, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp4ZoomProgress = zs4.p }, 470);
+      tl.to(rightColRef.current, { x: () => -1.5 * window.innerWidth, ease: 'power2.inOut', duration: 120 }, CLOSE_AT + 320);
 
-      // --- COMPARTMENT 5 ---
-      const zs5 = { p: 0 };
-      tl.to(zs5, { p: 1, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp5ZoomProgress = zs5.p }, 510);
-      tl.to(overlayRef.current, { opacity: 1, ease: 'power2.inOut', duration: 5 }, 530);
-      tl.to([zoom5Ref.current, zoom5TextRef.current], { opacity: 1, y: 0, ease: 'power3.out', duration: 15 }, 535);
-      tl.to([zoom5Ref.current, zoom5TextRef.current], { opacity: 0, y: 50, ease: 'power3.in', duration: 10 }, 570);
-      tl.to(overlayRef.current, { opacity: 0, ease: 'power3.inOut', duration: 15 }, 570);
-      tl.to(zs5, { p: 0, ease: 'power3.inOut', duration: 30, onUpdate: () => heroScroll.comp5ZoomProgress = zs5.p }, 570);
-
-      // --- CLOSE LID AND SLIDE OUT ---
-      const proxyClose = { progress: 1 };
-      tl.to(proxyClose, {
-        progress: 0, ease: 'power2.inOut', duration: 120, // Close completely
-        onUpdate: () => { heroScroll.rawProgress = proxyClose.progress; }
-      }, 610);
-
-      // --- TEXT APPEARS ---
-      tl.fromTo(finalTextLeftRef.current,
-        { x: -300, opacity: 0 },
-        { x: 0, opacity: 1, ease: 'power2.out', duration: 150 }, // Slowed down by tripling duration
-        730
-      );
-      tl.fromTo(finalTextRightRef.current,
-        { x: 300, opacity: 0 },
-        { x: 0, opacity: 1, ease: 'power2.out', duration: 150 }, // Slowed down
-        730
-      );
-
-      // --- WAIT A SPLIT SEC, THEN SLIDE OUT ---
-      tl.to(rightColRef.current, {
-        x: () => -1.5 * window.innerWidth, // Slide out left
-        ease: 'power2.inOut', duration: 120
-      }, 930); // Starts at 930 (730 + 150 text anim + 50 wait), Ends at 1050
-
-      // --- MOCK DASHBOARD APPEARS ---
-      tl.fromTo(mockDashboardRef.current,
+      tl.fromTo(previewRef.current,
         { xPercent: -50, yPercent: 150, opacity: 0 },
         { yPercent: -50, opacity: 1, ease: 'power3.out', duration: 150 },
-        1150 // Wait 100 units after bento box is completely gone
+        CLOSE_AT + 540,
       );
-
     });
 
     return () => ctx.revert();
@@ -173,25 +126,51 @@ function BentoHero() {
   const getStarted = () => navigate(auth.token ? '/dashboard' : '/login');
 
   return (
-    <div className="hero-container" ref={containerRef}>
+    <div className="hero-container" ref={containerRef} id="top">
       <div className="hero-content">
         <div className="hero-left-col" ref={leftColRef}>
-          <div className="logo"><img src={logoSrc} alt="Bento" className="logo-img" /></div>
+          <p className="hero-kicker">The engineering home for everything you build</p>
           <h1 className="heading">Every project deserves a place at <b>the table.</b></h1>
-          <p className="paragraph">One calm place for everything you build. Bento watches every project you own and tells you what deserves your attention today.</p>
+          <p className="paragraph">Bento watches every project you own — uptime, code health, dependencies — and tells you what deserves your attention today.</p>
           <div className="cta-group">
             <button className="btn-primary" onClick={getStarted}>Get started</button>
-            <button className="btn-secondary" onClick={scrollToStory}>See how it works <span aria-hidden="true">↓</span></button>
+            <button className="btn-secondary" onClick={scrollToStory}>Open the box <span aria-hidden="true">↓</span></button>
           </div>
         </div>
 
         <div className="hero-right-col" ref={rightColRef}>
-          <Canvas shadows camera={{ position: [-26.011, 13.694, 5.510], fov: 20 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }} className="hero-canvas">
+          <Canvas
+            shadows
+            camera={{ position: [-26.011, 13.694, 5.51], fov: 20 }}
+            dpr={[1, 1.5]}
+            gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
+            className="hero-canvas"
+          >
             <AnimationController />
+            <ambientLight intensity={0.45} />
+            <directionalLight
+              castShadow
+              position={[-7, 16, 9]}
+              intensity={2.4}
+              color="#fff4e8"
+              shadow-mapSize={[2048, 2048]}
+              shadow-camera-left={-10}
+              shadow-camera-right={10}
+              shadow-camera-top={10}
+              shadow-camera-bottom={-10}
+              shadow-camera-near={1}
+              shadow-camera-far={50}
+              shadow-bias={-0.0003}
+              shadow-normalBias={0.02}
+            />
+            <directionalLight position={[9, 5, -7]} intensity={0.8} color="#ffcfb0" />
+            {/* studio reflections for the lacquer, generated locally (no HDR download) */}
+            <Environment resolution={256} frames={1}>
+              <Lightformer form="rect" intensity={1.6} position={[-5, 9, 3]} rotation-x={Math.PI / 2} rotation-z={0.6} scale={[2.2, 16, 1]} />
+              <Lightformer form="rect" intensity={0.9} color="#ffe6d2" position={[-8, 4, 6]} rotation-y={Math.PI / 3} scale={[8, 3, 1]} />
+              <Lightformer form="rect" intensity={0.6} color="#ffb48a" position={[8, 3, -6]} rotation-y={-Math.PI / 3} scale={[6, 2, 1]} />
+            </Environment>
             <Suspense fallback={null}>
-              <ambientLight intensity={1.8} />
-              <directionalLight position={[-8, 10, 5]} intensity={3.6} color="#fff5ee" />
-              <directionalLight position={[5, 4, -4]} intensity={1.1} color="#ffffff" />
               <BentoModel />
             </Suspense>
           </Canvas>
@@ -200,48 +179,18 @@ function BentoHero() {
 
       <div className="scroll-hint" ref={scrollHintRef}>Scroll to open</div>
       <div ref={overlayRef} className="story-overlay" />
+      {/* keeps chapter text legible over the food */}
+      <div ref={scrimLRef} className="story-scrim story-scrim-l" />
+      <div ref={scrimRRef} className="story-scrim story-scrim-r" />
 
-      {/* COMPARTMENT 1 - Right Layout */}
-      <img src={zoom1Img} ref={zoom1Ref} className="story-img story-img-r" alt="" />
-      <div ref={zoom1TextRef} className="story-text story-text-r">
-        <p className="story-eyebrow">01 · Balance</p>
-        <h2 className="story-heading">Every bento needs <b>balance.</b></h2>
-        <p className="story-p">Every engineering portfolio does too. Pickle quietly brings together signals from every project and turns them into calm, actionable guidance.</p>
-      </div>
+      {CHAPTERS.map((ch, i) => (
+        <div key={ch.eyebrow} ref={(el) => { chapterRefs.current[i] = el; }} className={`story-text story-text-${ch.side}`}>
+          <p className="story-eyebrow">{ch.eyebrow}</p>
+          <h2 className="story-heading">{ch.title}</h2>
+          <p className="story-p">{ch.body}</p>
+        </div>
+      ))}
 
-      {/* COMPARTMENT 2 - Left Layout */}
-      <img src={zoom2Img} ref={zoom2Ref} className="story-img story-img-l" alt="" />
-      <div ref={zoomTextRef} className="story-text story-text-l">
-        <p className="story-eyebrow">02 · Habit</p>
-        <h2 className="story-heading">Healthy projects are <b>built daily.</b></h2>
-        <p className="story-p">Bento helps you make steady progress by focusing on the work that matters most — three things today, not fifty alerts.</p>
-      </div>
-
-      {/* COMPARTMENT 3 - Right Layout */}
-      <img src={zoom3Img} ref={zoom3Ref} className="story-img story-img-r" alt="" />
-      <div ref={zoom3TextRef} className="story-text story-text-r">
-        <p className="story-eyebrow">03 · Health</p>
-        <h2 className="story-heading">See beyond <b>the code.</b></h2>
-        <p className="story-p">Every project receives a living Engineering Health Score: a picture of its quality, not just its activity.</p>
-      </div>
-
-      {/* COMPARTMENT 4 - Left Layout */}
-      <img src={zoom4Img} ref={zoom4Ref} className="story-img story-img-l" alt="" />
-      <div ref={zoom4TextRef} className="story-text story-text-l">
-        <p className="story-eyebrow">04 · Everything</p>
-        <h2 className="story-heading">Bring everything <b>to the table.</b></h2>
-        <p className="story-p">Bento gathers every project into one place, giving you a complete view of your engineering world.</p>
-      </div>
-
-      {/* COMPARTMENT 5 - Right Layout */}
-      <img src={zoom5Img} ref={zoom5Ref} className="story-img story-img-r" alt="" />
-      <div ref={zoom5TextRef} className="story-text story-text-r">
-        <p className="story-eyebrow">05 · Signal</p>
-        <h2 className="story-heading">Every signal tells <b>a story.</b></h2>
-        <p className="story-p">Bento brings them together into clear recommendations you can actually act on.</p>
-      </div>
-
-      {/* FINAL SEQUENCE TEXTS */}
       <div ref={finalTextLeftRef} className="final-text final-text-l">
         <h2 className="final-heading">Everything you build.</h2>
       </div>
@@ -249,8 +198,7 @@ function BentoHero() {
         <h2 className="final-heading"><b>One engineering home.</b></h2>
       </div>
 
-      {/* MOCK DASHBOARD */}
-      <img ref={mockDashboardRef} src={mockDashboardImg} className="mock-dashboard" alt="The Bento dashboard" />
+      <DashboardPreview ref={previewRef} />
     </div>
   );
 }
@@ -288,7 +236,9 @@ function Footer() {
 export default function App() {
   return (
     <div className="landing">
+      <LandingNav />
       <BentoHero />
+      <LandingSections />
       <Footer />
     </div>
   );

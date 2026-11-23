@@ -24,6 +24,8 @@
 .hero-content {
   position: sticky;
   top: 0;
+  /* sticky creates its own layer: keep it (and the 3D canvas) above the story's tinted backdrop */
+  z-index: 1;
   height: 100vh;
   width: 100%;
   max-width: 1600px;
@@ -62,8 +64,14 @@
 }
 
 /* ---------- hero copy ---------- */
-.landing .logo { margin-bottom: 4vh; }
-.landing .logo-img { height: 34px; width: auto; display: block; }
+.hero-kicker {
+  margin: 0 0 22px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(23, 19, 15, 0.62);
+}
 
 .landing .heading {
   margin: 0 0 1.75rem;
@@ -163,16 +171,15 @@
   z-index: 0;
 }
 
-.story-img {
+.story-scrim {
   position: fixed;
+  inset: 0;
+  z-index: 9;
   opacity: 0;
-  transform: translateY(100px);
-  z-index: 10;
   pointer-events: none;
-  filter: drop-shadow(0 30px 40px rgba(40, 8, 0, 0.35));
 }
-.story-img-r { top: -5vh; left: -15vw; width: 60vw; }
-.story-img-l { top: 2vh; right: -18vw; width: 65vw; }
+.story-scrim-r { background: linear-gradient(285deg, rgba(92, 24, 6, 0.94) 0%, rgba(92, 24, 6, 0.78) 34%, rgba(92, 24, 6, 0) 62%); }
+.story-scrim-l { background: linear-gradient(105deg, rgba(92, 24, 6, 0.94) 0%, rgba(92, 24, 6, 0.78) 34%, rgba(92, 24, 6, 0) 62%); }
 
 .story-text {
   position: fixed;
@@ -231,17 +238,6 @@
 }
 .final-heading b { font-weight: 600; }
 
-.mock-dashboard {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: min(52vw, 900px);
-  z-index: 5;
-  opacity: 0;
-  border-radius: 14px;
-  box-shadow: 0 40px 80px -24px rgba(40, 8, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
 /* ---------- footer ---------- */
 .site-footer {
   position: relative;
@@ -282,5 +278,15 @@
 @media (max-width: 900px) {
   .hero-content { grid-template-columns: 1fr; }
   .hero-left-col { padding-right: 0; }
-  .story-text { width: calc(100vw - 48px); }
+  .story-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  opacity: 0;
+  pointer-events: none;
+}
+.story-scrim-r { background: linear-gradient(285deg, rgba(92, 24, 6, 0.94) 0%, rgba(92, 24, 6, 0.78) 34%, rgba(92, 24, 6, 0) 62%); }
+.story-scrim-l { background: linear-gradient(105deg, rgba(92, 24, 6, 0.94) 0%, rgba(92, 24, 6, 0.78) 34%, rgba(92, 24, 6, 0) 62%); }
+
+.story-text { width: calc(100vw - 48px); }
 }
