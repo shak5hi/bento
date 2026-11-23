@@ -55,8 +55,16 @@ endpoints is scored on code alone and marked "code only".
 | `POST /projects/{id}/scan` · `POST /projects/{id}/endpoints` · `DELETE /endpoints/{id}` | actions |
 | `GET /auth/providers` · `GET /auth/github/login` · `GET /auth/github/callback` | Sign in with GitHub |
 | `GET /github/status` · `POST /github/connect` · `GET /github/repos` · `POST /github/import` | connect the GitHub App, list and import repositories |
+| `PUT /projects/{id}/public` | turn the public status page and badge on or off (`{"enabled": true}`); the slug is created once and kept |
+| `GET /public/status/{slug}` | public status page data, no login: score, uptime 24 h / 7 d / 30 d, p95 latency (24 h), open and recently resolved incidents. Never includes code findings. Rate-limited, cached 30 s |
+| `GET /badge/{slug}.svg` | README badge `bento health \| 94`, coloured by status. Private or unknown slugs get a grey `unknown` badge (never a 404). Cached 5 min |
 | `POST /webhooks/github` | push + installation webhooks (needs `GITHUB_WEBHOOK_SECRET`) |
 | `GET /system` | pipeline status for the dashboard |
+
+**Public status page and badge.** In a project's drawer, switch on *Public status page*. The page lives at
+`/status/<slug>` and the drawer gives you the badge Markdown for your README:
+`[![Bento health](<PUBLIC_URL>/api/badge/<slug>.svg)](<PUBLIC_URL>/status/<slug>)`. Public pages show only
+uptime, latency, incidents (hostname only) and the score: code findings and vulnerabilities stay private.
 
 Interactive docs: http://localhost:8081/api/docs · Pipeline health: http://localhost:8081/health/services
 
