@@ -436,7 +436,7 @@
 .dialog::backdrop, .drawer::backdrop { background: rgba(23, 19, 15, 0.32); backdrop-filter: blur(2px); animation: fadein 0.2s ease; }
 @keyframes fadein { from { opacity: 0; } }
 
-.dialog { width: min(520px, calc(100vw - 32px)); border-radius: 14px; animation: rise 0.25s var(--ease); }
+.dialog { margin: auto; width: min(520px, calc(100vw - 32px)); border-radius: 14px; animation: rise 0.25s var(--ease); }
 .dialog-body { display: flex; flex-direction: column; gap: 16px; padding: 28px; }
 .dialog-title { margin: -4px 0 0; font-size: 1.6rem; font-weight: 300; letter-spacing: -0.03em; }
 .dialog-lede { margin: -6px 0 4px; font-size: 14px; color: var(--ink-3); line-height: 1.55; }
@@ -533,3 +533,25 @@
   .row { grid-template-columns: 90px minmax(0, 1fr) 28px; }
   .row .muted { display: none; }
 }
+
+/* ---------- new project: GitHub import ---------- */
+.dialog-wide { width: min(600px, calc(100vw - 32px)); }
+.dialog-form { display: flex; flex-direction: column; gap: 16px; }
+.tabs { display: flex; gap: 4px; padding: 3px; background: var(--paper-2); border-radius: 9px; align-self: flex-start; }
+.tabs button { padding: 7px 14px; font-size: 13px; font-weight: 500; color: var(--ink-3); background: none; border: 0; border-radius: 7px; cursor: pointer; }
+.tabs button.on { color: var(--ink); background: var(--surface); box-shadow: 0 1px 2px rgba(23, 19, 15, 0.08); }
+.linklike { padding: 0; font: inherit; color: var(--accent-ink); background: none; border: 0; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.repo-search { width: 100%; padding: 10px 12px; font-size: 14px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; outline: none; }
+.repo-search:focus { border-color: var(--ink); }
+.repo-list { max-height: 320px; margin: 0; padding: 0; overflow-y: auto; list-style: none; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.repo-list li + li { border-top: 1px solid var(--line); }
+.repo-empty { padding: 18px 14px; }
+.repo { display: flex; align-items: flex-start; gap: 12px; padding: 11px 14px; cursor: pointer; }
+.repo:hover { background: var(--paper); }
+.repo input { margin-top: 3px; accent-color: var(--ink); }
+.repo-added { cursor: default; opacity: 0.6; }
+.repo-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.repo-name { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
+.repo-meta { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill { padding: 1px 7px; font-size: 11px; font-weight: 500; color: var(--accent-ink); background: var(--accent-soft); border-radius: 99px; }
+.pill-quiet { color: var(--ink-3); background: var(--paper-2); }

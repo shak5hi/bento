@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, api, auth, type Dashboard as DashboardData, type ProjectSummary, type SystemHealth, type Task } from '../lib/api';
 import { STATUS_LABEL, effort, firstName, greeting, timeAgo } from '../lib/format';
 import { LineChart } from '../components/LineChart';
@@ -15,6 +15,17 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [openProject, setOpenProject] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const [flash, setFlash] = useState<string | null>(null);
+
+  // Back from GitHub: reopen the import dialog (or explain what went wrong).
+  useEffect(() => {
+    const gh = params.get('github');
+    if (!gh) return;
+    if (gh === 'connected' || gh === 'installed') setCreating(true);
+    else setFlash(params.get('message') || 'GitHub could not be connected. Please try again.');
+    setParams({}, { replace: true });
+  }, [params, setParams]);
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +55,11 @@ export default function Dashboard() {
         {error && !data && (
           <div className="notice notice-crit" role="alert">
             {error} <button onClick={load}>Retry</button>
+          </div>
+        )}
+        {flash && (
+          <div className="notice notice-crit" role="alert">
+            {flash} <button onClick={() => setFlash(null)}>Dismiss</button>
           </div>
         )}
         {!data && !error && <Skeleton />}
@@ -78,6 +94,10 @@ export default function Dashboard() {
             setCreating(false);
             load();
             setOpenProject(id);
+          }}
+          onImported={() => {
+            setCreating(false);
+            load();
           }}
         />
       )}

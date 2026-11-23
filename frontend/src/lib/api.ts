@@ -157,3 +157,25 @@ export interface SystemHealth {
   queues: Record<string, { waiting: number; unacked: number }>;
   alerts: { sent: number; suppressed: number };
 }
+
+// ---------- GitHub ----------
+
+export interface GitHubStatus {
+  configured: boolean;
+  login: string | null;
+  installations: { id: number; account: string; type: string | null }[];
+}
+
+export interface GitHubRepo {
+  installationId: number;
+  fullName: string;
+  name: string;
+  private: boolean;
+  description: string | null;
+  language: string | null;
+  homepage: string | null;
+  url: string;
+  pushedAt: string | null;
+  archived: boolean;
+  projectId: string | null;
+}
