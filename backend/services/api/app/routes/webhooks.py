@@ -45,6 +45,8 @@ async def github(
     payload = json.loads(body)
     if x_github_event in ("installation", "installation_repositories"):
         return await _installation_event(x_github_event, payload)
+    if x_github_event == "pull_request":
+        return await _pull_request_event(payload)
     if x_github_event != "push":
         return {"ok": True, "ignored": x_github_event}
 
@@ -79,3 +81,19 @@ async def _installation_event(event: str, payload: dict) -> dict:
             inst_id, names,
         )
     return {"ok": True, "event": event, "action": action}
+
+
+async def _pull_request_event(payload: dict) -> dict:
+    """Track Bento's fix PRs: when one is merged or closed, the drawer offers the button again if needed."""
+    pr = payload.get("pull_request") or {}
+    full_name = (payload.get("repository", {}).get("full_name") or "").lower()
+    if payload.get("action") != "closed" or not (pr.get("head", {}).get("ref") or "").startswith("bento/"):
+        return {"ok": True, "ignored": "pull_request"}
+    status = "merged" if pr.get("merged") else "closed"
+    result = await state.pg.execute(
+        """UPDATE fix_prs f SET status = $3, updated_at = now() FROM projects p
+            WHERE f.project_id = p.id AND p.repo_full_name = $1 AND f.pr_number = $2 AND f.status = 'open'""",
+        full_name, pr.get("number"), status,
+    )
+    log.info("fix PR %s#%s %s (%s)", full_name, pr.get("number"), status, result)
+    return {"ok": True, "pr": pr.get("number"), "status": status}

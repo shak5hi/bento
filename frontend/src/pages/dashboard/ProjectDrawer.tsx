@@ -19,6 +19,39 @@ const PARTS = [
 
 const EP_STATE = { normal: 'Normal', failing: 'Failing', incident: 'Incident', pending: 'First probe soon' } as const;
 
+type Finding = ProjectDetail['findings'][number];
+
+/** Under a finding: the fix button, or where its pull request is. Bento never merges. */
+function FixAction({ finding, busy, onFix }: { finding: Finding; busy: boolean; onFix: () => void }) {
+  const fix = finding.fix;
+  if (fix?.status === 'open' && fix.prUrl) {
+    return (
+      <a className="fix-link" href={fix.prUrl} target="_blank" rel="noreferrer">
+        PR #{fix.prNumber} open ↗
+      </a>
+    );
+  }
+  if (fix?.status === 'queued' || busy) {
+    return <span className="fix-pending"><RiceBallInline />Opening a pull request…</span>;
+  }
+  if (fix?.status === 'merged' && fix.prUrl) {
+    return (
+      <a className="fix-link" href={fix.prUrl} target="_blank" rel="noreferrer">
+        PR #{fix.prNumber} merged ↗ <span className="muted">· resolves on the next scan</span>
+      </a>
+    );
+  }
+  if (!finding.fixable) return null;
+  return (
+    <span className="fix-row">
+      {fix?.status === 'failed' && fix.error && <span className="fix-error">Last attempt failed: {fix.error}</span>}
+      <button type="button" className="btn btn-sm" onClick={onFix}>
+        {fix?.status === 'failed' ? 'Try again' : 'Fix with a pull request'}
+      </button>
+    </span>
+  );
+}
+
 export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [data, setData] = useState<ProjectDetail | null>(null);
@@ -252,6 +285,17 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
                       <div>
                         <strong>{f.title}</strong>
                         {f.detail && <p>{f.detail}</p>}
+                        <FixAction
+                          finding={f}
+                          busy={busy === `fix-${f.id}`}
+                          onFix={() =>
+                            run(
+                              `fix-${f.id}`,
+                              () => api(`/projects/${projectId}/findings/${f.id}/fix`, { method: 'POST' }),
+                              'Bento is opening a pull request. It appears here in a few seconds.',
+                            )
+                          }
+                        />
                       </div>
                       {effort(f.effortMinutes) && <span className="muted small">{effort(f.effortMinutes)}</span>}
                     </li>

@@ -141,6 +141,22 @@ CREATE INDEX IF NOT EXISTS projects_installation_idx ON projects (installation_i
 -- turned off, so turning it back on restores the same URL (and existing badges keep working).
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS public_slug TEXT UNIQUE;
+
+-- Auto-fix pull requests: one row per attempt. At most one queued/open PR per finding.
+CREATE TABLE IF NOT EXISTS fix_prs (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id  UUID NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+  finding_key TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'open', 'merged', 'closed', 'failed')),
+  branch      TEXT,
+  pr_number   INT,
+  pr_url      TEXT,
+  error       TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS fix_prs_active_idx ON fix_prs (project_id, finding_key) WHERE status IN ('queued', 'open');
+CREATE INDEX IF NOT EXISTS fix_prs_pr_idx ON fix_prs (project_id, pr_number);
 """
 
 TIMESCALE = """

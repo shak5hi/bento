@@ -7,12 +7,12 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from bento_core import streams
+from bento_core import github, streams
 from bento_core.config import settings
 from bento_core.net import probe_target_error, repo_full_name, repo_url_error
 from bento_core.scoring import status_for
 
-from ..security import current_user_id
+from ..security import current_user_id, rate_limit
 from ..state import state
 
 router = APIRouter(prefix="/api", tags=["projects"])
@@ -136,6 +136,15 @@ async def get_project(project_id: UUID, user_id: UUID = Depends(current_user_id)
         "SELECT * FROM incidents WHERE project_id = $1 ORDER BY opened_at DESC LIMIT 20", project_id
     )
     advice = await state.pg.fetchrow("SELECT * FROM advice WHERE project_id = $1", project_id)
+    # latest fix attempt per finding (queued/open ones win: there's at most one of those per finding)
+    fix_rows = await state.pg.fetch(
+        """SELECT DISTINCT ON (finding_key) finding_key, status, pr_url, pr_number, error
+             FROM fix_prs WHERE project_id = $1
+            ORDER BY finding_key, (status IN ('queued', 'open')) DESC, created_at DESC""",
+        project_id,
+    )
+    fix_by_key = {r["finding_key"]: r for r in fix_rows}
+    can_fix = row["installation_id"] is not None
     last = await state.ts.fetch(
         """SELECT DISTINCT ON (endpoint_id) endpoint_id, time, status, latency_ms, ok
              FROM probe_results WHERE project_id = $1 AND time > now() - interval '1 hour'
@@ -171,6 +180,17 @@ async def get_project(project_id: UUID, user_id: UUID = Depends(current_user_id)
                 "detail": f["detail"],
                 "effortMinutes": f["effort_minutes"],
                 "firstSeen": f["first_seen"],
+                "fixable": can_fix and github.fixable_finding(f["key"]),
+                "fix": (
+                    {
+                        "status": fx["status"],
+                        "prUrl": fx["pr_url"],
+                        "prNumber": fx["pr_number"],
+                        "error": fx["error"],
+                    }
+                    if (fx := fix_by_key.get(f["key"]))
+                    else None
+                ),
             }
             for f in findings
         ],
@@ -284,6 +304,36 @@ async def scan_now(project_id: UUID, user_id: UUID = Depends(current_user_id)):
         raise HTTPException(422, "Add a repository URL to this project first")
     await _queue_scan(project_id, "manual", force=True)
     return {"queued": True}
+
+
+@router.post(
+    "/projects/{project_id}/findings/{finding_id}/fix",
+    status_code=202,
+    dependencies=[Depends(rate_limit("fix", 20, 60))],
+)
+async def fix_finding(project_id: UUID, finding_id: UUID, user_id: UUID = Depends(current_user_id)):
+    """Queue an auto-fix pull request. The fixer worker does the GitHub work, not this request."""
+    project = await owned_project(project_id, user_id)
+    finding = await state.pg.fetchrow(
+        "SELECT key FROM findings WHERE id = $1 AND project_id = $2 AND status = 'open'", finding_id, project_id
+    )
+    if finding is None:
+        raise HTTPException(404, "Finding not found or already resolved")
+    if project["installation_id"] is None:
+        raise HTTPException(422, "Auto-fix works for repositories imported through the Bento GitHub app")
+    if not github.fixable_finding(finding["key"]):
+        raise HTTPException(422, "Bento can't fix this kind of finding automatically yet")
+    fix = await state.pg.fetchrow(
+        """INSERT INTO fix_prs (project_id, finding_key) VALUES ($1, $2)
+           ON CONFLICT (project_id, finding_key) WHERE status IN ('queued', 'open') DO NOTHING
+           RETURNING id""",
+        project_id,
+        finding["key"],
+    )
+    if fix is None:
+        raise HTTPException(409, "A fix pull request for this finding is already open or on its way")
+    await streams.publish(state.redis, streams.FIX_JOBS, {"fix_id": str(fix["id"])})
+    return {"queued": True, "fixId": str(fix["id"])}
 
 
 @router.post("/projects/{project_id}/endpoints", status_code=201)

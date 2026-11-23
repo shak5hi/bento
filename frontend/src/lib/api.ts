@@ -141,7 +141,17 @@ export interface ProjectDetail {
     lastLatencyMs: number | null;
     lastProbedAt: string | null;
   }[];
-  findings: { id: string; severity: Severity; title: string; detail: string | null; effortMinutes: number | null; firstSeen: string }[];
+  findings: {
+    id: string;
+    severity: Severity;
+    title: string;
+    detail: string | null;
+    effortMinutes: number | null;
+    firstSeen: string;
+    /** Bento can open a pull request for this (GitHub-app projects only). */
+    fixable: boolean;
+    fix: { status: 'queued' | 'open' | 'merged' | 'closed' | 'failed'; prUrl: string | null; prNumber: number | null; error: string | null } | null;
+  }[];
   incidents: { id: string; url: string; kind: 'latency' | 'errors'; status: 'open' | 'closed'; baseline: number | null; peak: number | null; openedAt: string; closedAt: string | null }[];
   advice: { brief: string; recommendations: Recommendation[]; generatedAt: string } | null;
 }

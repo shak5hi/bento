@@ -33,6 +33,7 @@ PROBE PIPELINE
 | **analyzer** | Batches results into TimescaleDB, keeps an EWMA latency/error baseline per endpoint, opens an incident after 3 breaching probes (latency z > 3 and > 250 ms; errors ≥ 20 % and unusual, or ≥ 50 % regardless) and closes it after 3 normal ones. Computes the Engineering Health Score every minute. If TimescaleDB rejects writes, the batch stays in the stream — nothing is dropped. |
 | **notifier** | Turns alerts into in-app notifications (and Slack if configured). Repeats for an open incident are suppressed for 30 minutes. |
 | **scanner** | Fetches exactly one commit (shallow, no hooks, size cap, unprivileged, tmpfs) and runs static checks: secrets in code (known token formats and high-entropy credentials; file and line only, the value is never stored), committed `.env` files, missing tests / CI / README / lockfile, known-vulnerable dependencies via [OSV](https://osv.dev), npm/PyPI dependencies a major version behind (registry lookups cached 6 h in Redis), and Dockerfile checks (unpinned base image, root user, ADD vs COPY, secrets in ENV/ARG, no HEALTHCHECK). Repository code is never executed. GitHub's duplicate deliveries are skipped by commit SHA; *Scan now* always rescans. |
+| **fixer** | Auto-fix pull requests. Consumes `fix.jobs` and, with the project's GitHub App installation token, creates a `bento/fix-<finding>` branch, one commit and a PR. Fixes: missing CI (workflow for the detected language), missing README, committed `.env` files (deleted, never read; the PR says to rotate the secrets), vulnerable npm/PyPI dependencies (bumped to the OSV fixed version; the PR says when a lockfile needs regenerating). It can't write any ref outside `bento/`, so the default branch is never touched and a human always merges. One open PR per finding. |
 | **advisor** | "Pickle". Rule-based: ranks a project's live incidents and code findings by severity and writes a short brief plus ≤ 3 recommendations. Skips the work when the findings hash is unchanged. No external AI service is used. |
 
 **Data stores:** Postgres (users, projects, endpoints, scans, findings, incidents, advice, notifications) ·
@@ -53,12 +54,13 @@ endpoints is scored on code alone and marked "code only".
 | `GET/POST /projects` · `GET/PATCH/DELETE /projects/{id}` | projects (detail includes endpoints, findings, incidents, Pickle's advice) |
 | `GET /projects/{id}/latency?minutes=60` | p95 latency series |
 | `POST /projects/{id}/scan` · `POST /projects/{id}/endpoints` · `DELETE /endpoints/{id}` | actions |
+| `POST /projects/{id}/findings/{finding_id}/fix` | queue an auto-fix pull request (GitHub-app projects; 409 if one is already open) |
 | `GET /auth/providers` · `GET /auth/github/login` · `GET /auth/github/callback` | Sign in with GitHub |
 | `GET /github/status` · `POST /github/connect` · `GET /github/repos` · `POST /github/import` | connect the GitHub App, list and import repositories |
 | `PUT /projects/{id}/public` | turn the public status page and badge on or off (`{"enabled": true}`); the slug is created once and kept |
 | `GET /public/status/{slug}` | public status page data, no login: score, uptime 24 h / 7 d / 30 d, p95 latency (24 h), open and recently resolved incidents. Never includes code findings. Rate-limited, cached 30 s |
 | `GET /badge/{slug}.svg` | README badge `bento health \| 94`, coloured by status. Private or unknown slugs get a grey `unknown` badge (never a 404). Cached 5 min |
-| `POST /webhooks/github` | push + installation webhooks (needs `GITHUB_WEBHOOK_SECRET`) |
+| `POST /webhooks/github` | push, pull request + installation webhooks (needs `GITHUB_WEBHOOK_SECRET`) |
 | `GET /system` | pipeline status for the dashboard |
 
 **Public status page and badge.** In a project's drawer, switch on *Public status page*. The page lives at
@@ -98,7 +100,8 @@ settings Bento still works with public repository URLs.
    | ☑ Request user authorization (OAuth) during installation | checked |
    | Setup URL | `<PUBLIC_URL>/api/auth/github/callback`, ☑ Redirect on update |
    | Webhook | ☑ Active, URL `https://<public-host>/api/webhooks/github`, secret = a long random string |
-2. **Permissions** - Repository: *Contents* read & write, *Pull requests* read & write, *Checks* read & write,
+2. **Permissions** - Repository: *Contents* read & write, *Pull requests* read & write, *Workflows* read & write
+   (needed to add CI files), *Checks* read & write,
    *Metadata* read. Account: *Email addresses* read.
    (Write access is used by PR checks and auto-fix pull requests; scanning only reads.)
 3. **Subscribe to events**: *Push*, *Pull request*.
@@ -129,7 +132,7 @@ backend/
 ├── shared/bento_core/ config, db pools, Redis Streams consumer, scoring, URL safety
 └── services/
     ├── api/app/       FastAPI gateway (routes/, migrations, security)
-    ├── scheduler/  prober/  analyzer/  notifier/  scanner/  advisor/
+    ├── scheduler/  prober/  analyzer/  notifier/  scanner/  advisor/  fixer/
 ```
 
 ```bash

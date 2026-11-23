@@ -52,6 +52,11 @@ async def installation_token(installation_id: int, http: httpx.AsyncClient) -> s
     return token
 
 
+def fixable_finding(key: str) -> bool:
+    """Findings the fixer can turn into a pull request (shared by the API and the fixer)."""
+    return key in ("no-ci", "no-readme", "secrets-env-file") or key.startswith(("vuln:npm:", "vuln:PyPI:"))
+
+
 def git_auth_header(token: str) -> str:
     """HTTP header for git over https; keeps the token out of URLs (and so out of error messages)."""
     basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()

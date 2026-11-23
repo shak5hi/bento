@@ -26,6 +26,7 @@ PROBE_RESULTS = "probe.results"
 ALERTS = "alerts"
 SCAN_JOBS = "scan.jobs"
 ADVICE_REQUESTS = "advice.requests"
+FIX_JOBS = "fix.jobs"
 
 CLAIM_IDLE_MS = 30_000
 MAXLEN = 200_000
