@@ -513,6 +513,14 @@
 .share-row input:focus { border-color: var(--ink); }
 .badge-preview { align-self: flex-start; margin: 4px 0 0 60px; }
 
+/* auto-fix pull requests */
+.btn-sm { padding: 5px 10px; font-size: 12.5px; border-radius: 7px; }
+.fix-row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 10px; }
+.fix-link { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 500; color: var(--accent-ink); text-decoration: none; }
+.fix-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.fix-pending { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--ink-3); }
+.fix-error { font-size: 12.5px; line-height: 1.45; color: var(--crit); }
+
 .drawer-foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 8px; }
 
 /* ---------- responsive ---------- */
