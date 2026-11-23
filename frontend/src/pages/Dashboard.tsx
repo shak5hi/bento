@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, api, auth, type Dashboard as DashboardData, type ProjectSummary, type SystemHealth, type Task } from '../lib/api';
 import { STATUS_LABEL, effort, firstName, greeting, timeAgo } from '../lib/format';
 import { LineChart } from '../components/LineChart';
+import { RiceBall } from '../components/RiceBall';
 import { ProjectDrawer } from './dashboard/ProjectDrawer';
 import { NewProjectDialog } from './dashboard/NewProjectDialog';
 import './Dashboard.css';
@@ -62,7 +63,7 @@ export default function Dashboard() {
             {flash} <button onClick={() => setFlash(null)}>Dismiss</button>
           </div>
         )}
-        {!data && !error && <Skeleton />}
+        {!data && !error && <RiceBall size={56} label="Loading your workspace" />}
 
         {data && data.projects.length === 0 && <EmptyState name={firstName(data.user.name, data.user.email)} onNew={() => setCreating(true)} />}
 
@@ -388,18 +389,5 @@ function EmptyState({ name, onNew }: { name: string; onNew: () => void }) {
       </ol>
       <button className="btn btn-primary btn-lg" onClick={onNew}>Add your first project</button>
     </section>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div className="skeleton" aria-busy="true" aria-label="Loading your workspace">
-      <div className="sk sk-title" />
-      <div className="sk sk-block" />
-      <div className="sk-row">
-        <div className="sk sk-card" />
-        <div className="sk sk-card" />
-      </div>
-    </div>
   );
 }

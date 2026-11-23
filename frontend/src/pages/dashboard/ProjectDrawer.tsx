@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api, type LatencyPoint, type ProjectDetail } from '../../lib/api';
 import { SEVERITY_LABEL, STATUS_LABEL, effort, host, timeAgo } from '../../lib/format';
 import { LineChart } from '../../components/LineChart';
+import { RiceBall } from '../../components/RiceBall';
 
 interface Props {
   projectId: string;
@@ -101,7 +102,7 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
         <header className="drawer-head">
           <div>
             <p className="eyebrow">Project</p>
-            <h2>{p?.name ?? 'Loading…'}</h2>
+            <h2>{p?.name ?? ' '}</h2>
             {p?.repoUrl && (
               <a className="drawer-link" href={p.repoUrl} target="_blank" rel="noreferrer">
                 {host(p.repoUrl)} ↗
@@ -113,6 +114,8 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
 
         {error && <div className="notice notice-crit" role="alert">{error}</div>}
         {toast && <div className="notice" role="status">{toast}</div>}
+
+        {!data && !error && <RiceBall label="Loading project" />}
 
         {data && p && (
           <>

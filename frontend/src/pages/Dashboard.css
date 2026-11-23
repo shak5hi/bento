@@ -374,13 +374,6 @@
 .steps strong { font-weight: 600; font-size: 15px; }
 .steps p { margin: 2px 0 0; font-size: 14px; color: var(--ink-3); }
 
-.skeleton { display: flex; flex-direction: column; gap: 20px; }
-.sk { border-radius: var(--radius); background: linear-gradient(90deg, var(--paper-2), #efebe4, var(--paper-2)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
-.sk-title { height: 56px; width: 55%; }
-.sk-block { height: 120px; }
-.sk-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.sk-card { height: 220px; }
-@keyframes shimmer { to { background-position: -200% 0; } }
 
 .notice {
   margin-bottom: 20px;
