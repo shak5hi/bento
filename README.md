@@ -38,8 +38,9 @@ PROBE PIPELINE
 ```
 
 1. **Connect.** Sign in with GitHub and pick repositories (private ones too). A repo's *Website* is monitored automatically.
-2. **Scan.** Every push is scanned in a sandbox: leaked `.env` files, known-vulnerable dependencies
-   ([OSV](https://osv.dev)), missing tests, CI, README or lockfile. Repository code is never executed.
+2. **Scan.** Every push is scanned in a sandbox: secrets in code (AWS, GitHub, Stripe, Slack, private keys) and
+   leaked `.env` files, known-vulnerable ([OSV](https://osv.dev)) and outdated dependencies, Dockerfile practices,
+   missing tests, CI, README or lockfile. Repository code is never executed and secret values are never stored.
 3. **Probe.** Live sites are checked every minute. The analyzer learns each endpoint's normal latency and
    error rate (EWMA) and opens an incident after 3 abnormal checks in a row.
 4. **Score.** `Uptime 40 + Latency 20 + Errors 20 + Code 20`, recomputed every minute.
@@ -100,7 +101,7 @@ private repositories, create a GitHub App: see [Connect GitHub](backend/README.m
 - [ ] Auto-fix pull requests (always waiting for human approval)
 - [x] Public status pages and README badges
 - [ ] Email alerts and a weekly digest
-- [ ] Deeper scanning: secrets in code, outdated dependencies, Dockerfiles
+- [x] Deeper scanning: secrets in code, outdated dependencies, Dockerfiles
 - [ ] Test suite and CI · `bento` CLI · hosted deployment
 
 ## License
