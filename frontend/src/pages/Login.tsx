@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, api, auth } from '../lib/api';
 import { RiceBallInline } from '../components/RiceBall';
+import logoSrc from '../assets/logo.png';
 import './Login.css';
 
 import zoom1Img from '../assets/compartmentzoom1.svg';
@@ -53,8 +54,7 @@ export default function Login() {
       <section className="auth-panel">
         <header className="auth-top">
           <Link to="/" className="auth-mark" aria-label="Bento home">
-            <span className="mark">B</span>
-            <span>Bento</span>
+            <img src={logoSrc} alt="Bento" className="brand-logo" />
           </Link>
           <Link to="/" className="auth-back">Back to site</Link>
         </header>

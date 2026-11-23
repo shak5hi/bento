@@ -6,6 +6,7 @@ import { LineChart } from '../components/LineChart';
 import { RiceBall } from '../components/RiceBall';
 import { ProjectDrawer } from './dashboard/ProjectDrawer';
 import { NewProjectDialog } from './dashboard/NewProjectDialog';
+import logoSrc from '../assets/logo.png';
 import './Dashboard.css';
 
 const REFRESH_MS = 15_000;
@@ -131,8 +132,7 @@ function TopBar({ data, system, onNew }: { data: DashboardData | null; system: S
   return (
     <header className="topbar">
       <Link to="/dashboard" className="brand">
-        <span className="mark">B</span>
-        <span>Bento</span>
+        <img src={logoSrc} alt="Bento" className="brand-logo" />
       </Link>
 
       <div className="topbar-right">

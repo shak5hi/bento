@@ -189,7 +189,7 @@
 }
 .dp-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 22px; border-bottom: 1px solid var(--line); }
 .dp-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
-.dp-brand i { display: grid; place-items: center; width: 20px; height: 20px; border: 1.2px solid var(--ink); border-radius: 5px; font-style: normal; font-size: 10px; }
+.dp-brand img { display: block; height: 14px; width: auto; }
 .dp-live { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .dp-live b { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
 .dp-body { padding: 22px 26px 26px; }

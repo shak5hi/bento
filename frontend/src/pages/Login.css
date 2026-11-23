@@ -32,16 +32,6 @@
   letter-spacing: -0.01em;
 }
 
-.auth .mark {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1.4px solid var(--ink);
-  border-radius: 7px;
-  font-size: 14px;
-  font-weight: 600;
-}
 
 .auth-back {
   font-size: 14px;
@@ -275,3 +265,5 @@
   color: var(--ink-3);
 }
 .auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }
+
+.auth-mark .brand-logo { display: block; height: 22px; width: auto; }
