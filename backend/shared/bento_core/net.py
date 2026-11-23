@@ -15,8 +15,12 @@ def _is_private(host: str) -> bool:
     except socket.gaierror:
         return False  # unresolvable: the probe itself will report the failure
     for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])  # drop an IPv6 zone id
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped  # ::ffff:127.0.0.1 is 127.0.0.1
+        # Anything not globally routable: private, loopback, link-local (cloud metadata), reserved,
+        # multicast, and shared/carrier-grade NAT space (100.64.0.0/10), which is_private misses.
+        if not ip.is_global or ip.is_multicast:
             return True
     return False
 

@@ -4,6 +4,7 @@
 
 **An engineering health platform. Connect your GitHub repositories and live sites once, and Bento tells you what across your projects actually needs attention today.**
 
+[![CI](https://github.com/shak5hi/bento/actions/workflows/tests.yml/badge.svg)](https://github.com/shak5hi/bento/actions/workflows/tests.yml)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Three.js](https://img.shields.io/badge/Three.js-R3F-000000?style=flat-square&logo=threedotjs)](https://threejs.org)
@@ -124,7 +125,8 @@ private repositories, create a GitHub App: see [Connect GitHub](backend/README.m
 - [ ] Email alerts and a weekly digest
 - [x] Deeper scanning: secrets in code, outdated dependencies, Dockerfiles
 - [x] `bento` CLI and GitHub Action
-- [ ] Test suite and CI · hosted deployment
+- [x] Test suite and CI
+- [ ] Hosted deployment
 
 ## License
 

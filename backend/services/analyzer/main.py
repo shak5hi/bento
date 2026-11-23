@@ -112,6 +112,8 @@ class Analyzer:
         elif normal:
             tr["b"] = 0
             tr["o"] += 1
+            if not tr["open"]:
+                tr["peak"] = 0.0  # a breach run that never became an incident: forget its peak
 
         alert_base = {
             "kind": kind,
@@ -123,12 +125,12 @@ class Analyzer:
         }
 
         if not tr["open"] and tr["b"] >= BREACHES_TO_OPEN:
-            tr["peak"] = value
             tr["o"] = 0
+            # the worst probe of the breach run that opened it, not just the last one
             incident_id = await self.pg.fetchval(
                 """INSERT INTO incidents (project_id, endpoint_id, url, kind, baseline, peak)
                    VALUES ($1, $2, $3, $4, $5, $6) RETURNING id""",
-                res["project_id"], res["endpoint_id"], res["url"], kind, alert_base["baseline"], value,
+                res["project_id"], res["endpoint_id"], res["url"], kind, alert_base["baseline"], tr["peak"],
             )
             tr["open"] = str(incident_id)
             log.warning("OPEN %s incident on %s (value %.2f, baseline %.2f)", kind, res["url"], value, alert_base["baseline"])

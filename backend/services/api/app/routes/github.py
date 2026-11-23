@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["github"])
 
 STATE_TTL = timedelta(minutes=10)
+STATE_TYPE = "oauth-state"  # session tokens share the signing key; this keeps the two from being swapped
 
 
 # ---------- helpers ----------
@@ -47,7 +48,7 @@ def _require_github() -> None:
 async def _make_state(intent: str, user_id: UUID | None = None) -> str:
     nonce = secrets.token_urlsafe(16)
     await state.redis.set(f"oauth-state:{nonce}", "1", ex=int(STATE_TTL.total_seconds()))
-    payload = {"n": nonce, "i": intent, "exp": datetime.now(timezone.utc) + STATE_TTL}
+    payload = {"typ": STATE_TYPE, "n": nonce, "i": intent, "exp": datetime.now(timezone.utc) + STATE_TTL}
     if user_id:
         payload["u"] = str(user_id)
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
@@ -59,6 +60,8 @@ async def _read_state(raw: str | None) -> dict:
         payload = jwt.decode(raw or "", JWT_SECRET, algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(400, "This sign-in link has expired. Please try again.") from None
+    if payload.get("typ") != STATE_TYPE or not isinstance(payload.get("n"), str):
+        raise HTTPException(400, "This sign-in link isn't valid. Please try again.")
     if not await state.redis.delete(f"oauth-state:{payload['n']}"):
         raise HTTPException(400, "This sign-in link was already used. Please try again.")
     return payload
