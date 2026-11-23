@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.integration
 
-TABLES = "users, projects, endpoints, scans, findings, incidents, project_scores, advice, notifications, github_installations, fix_prs"
+TABLES = "users, projects, endpoints, scans, findings, incidents, project_scores, advice, notifications, github_installations, fix_prs, score_events"
 
 
 def _admin_url(url: str) -> str:

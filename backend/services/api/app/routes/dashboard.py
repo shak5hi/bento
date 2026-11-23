@@ -15,6 +15,7 @@ from bento_core.scoring import status_for
 
 from ..security import current_user_id
 from ..state import state
+from .projects import week_changes
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -51,7 +52,7 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
     user = await state.pg.fetchrow("SELECT name, email FROM users WHERE id = $1", user_id)
 
     projects = await state.pg.fetch(
-        """SELECT p.id, p.name, p.repo_url, p.last_scan_at, s.total, s.basis,
+        """SELECT p.id, p.name, p.repo_url, p.last_scan_at, s.total, s.basis, s.grade, s.next_action,
                   (SELECT count(*) FROM endpoints e WHERE e.project_id = p.id)                         AS endpoints,
                   (SELECT count(*) FROM incidents i WHERE i.project_id = p.id AND i.status = 'open')    AS open_incidents,
                   (SELECT count(*) FROM findings f WHERE f.project_id = p.id AND f.status = 'open')     AS open_findings
@@ -122,6 +123,7 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
         user_id,
     )
 
+    weeks = await week_changes([p["id"] for p in projects], {p["id"]: p["total"] for p in projects})
     project_list = sorted(
         (
             {
@@ -129,6 +131,9 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
                 "name": p["name"],
                 "repoUrl": p["repo_url"],
                 "health": p["total"],
+                "grade": p["grade"],
+                "weekChange": weeks.get(p["id"]),
+                "nextAction": p["next_action"],
                 "basis": p["basis"],
                 "status": status_for(p["total"]),
                 "endpoints": p["endpoints"],
