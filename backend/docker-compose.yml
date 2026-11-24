@@ -138,7 +138,28 @@ services:
   advisor:
     <<: *worker
     build: { context: ., dockerfile: docker/python.Dockerfile, args: { SERVICE: advisor } }
-    environment: *env
+    environment:
+      <<: *env
+      OLLAMA_URL: ${OLLAMA_URL-http://ollama:11434} # set to empty for rule-based Pickle only
+      PICKLE_MODEL: ${PICKLE_MODEL:-qwen2.5:1.5b}
+
+  # Pickle's writer: an open model running locally (no hosted AI, nothing leaves this machine).
+  # The first start downloads the model (~1 GB) into the ollama_models volume.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: bento-ollama
+    restart: unless-stopped
+    networks: [backend-net]
+    environment:
+      PICKLE_MODEL: ${PICKLE_MODEL:-qwen2.5:1.5b}
+      OLLAMA_KEEP_ALIVE: 30m
+    entrypoint: ["/bin/sh", "-c", "ollama serve & pid=$$!; sleep 3; ollama pull \"$$PICKLE_MODEL\"; wait $$pid"]
+    volumes: [ollama_models:/root/.ollama]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # ─────────────── Data stores ───────────────
   postgres: # projects, findings, incidents, advice, users
@@ -196,3 +217,4 @@ volumes:
   timescale_data:
   redis_data:
   frontend_node_modules:
+  ollama_models:

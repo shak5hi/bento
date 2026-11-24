@@ -114,10 +114,17 @@ class Fixer:
             raise FixError(f"Couldn't find the installed version of {name} in package-lock.json.")
         fixed, unfixed = await fixes.fixed_version("npm", name, current, self.http)
         try:
-            new_pkg = fixes.bump_package_json(pkg, name, fixed)
+            new_pkg, transitive = fixes.bump_package_json(pkg, name, fixed)
         except ValueError:
             raise FixError("package.json isn't valid JSON.") from None
-        lock_note = (
+        how = (
+            f"`{name}` isn't one of your direct dependencies: another package pulls it in. So instead of bumping a "
+            f"version, this adds an npm **override** (`\"overrides\": {{\"{name}\": \"^{fixed}\"}}` in `package.json`), "
+            f"which makes every copy of `{name}` at least {fixed}. Needs npm 8.3 or newer. Once the packages that "
+            f"depend on it ship the fix themselves, you can remove the override.\n\n"
+            if transitive else ""
+        )
+        lock_note = how + (
             "> [!IMPORTANT]\n> **The lockfile still needs regenerating.** Bento only edits `package.json`. "
             "Check out this branch, run `npm install`, and commit the updated `package-lock.json`, "
             "otherwise `npm ci` keeps installing the old version.\n\n"

@@ -75,13 +75,28 @@ def test_env_fix_when_already_gone():
 
 def test_bump_package_json_keeps_formatting_and_prefix():
     text = '{\n    "dependencies": {\n        "lodash": "^4.17.15",\n        "lodash-es": "^4.17.15"\n    }\n}\n'
-    out = fixes.bump_package_json(text, "lodash", "4.17.21")
-    assert out == text.replace('"lodash": "^4.17.15"', '"lodash": "^4.17.21"')
+    out, transitive = fixes.bump_package_json(text, "lodash", "4.17.21")
+    assert out == text.replace('"lodash": "^4.17.15"', '"lodash": "^4.17.21"') and transitive is False
 
 
-def test_transitive_dependency_cant_be_bumped():
-    with pytest.raises(FixError, match="not a direct dependency"):
-        fixes.bump_package_json('{"dependencies": {"express": "^4"}}', "qs", "6.10.3")
+def test_transitive_dependency_gets_an_npm_override():
+    text = '{\n    "name": "app",\n    "dependencies": {\n        "express": "^4"\n    }\n}\n'
+    out, transitive = fixes.bump_package_json(text, "browserslist", "4.28.2")
+    assert transitive is True
+    assert json.loads(out)["overrides"] == {"browserslist": "^4.28.2"}
+    assert json.loads(out)["dependencies"] == {"express": "^4"}
+    assert out.endswith("}\n") and '\n    "overrides": {' in out  # keeps the file's 4-space indent
+
+
+def test_existing_overrides_are_kept():
+    text = '{"dependencies": {}, "overrides": {"semver": "^7.5.2"}}'
+    out, _ = fixes.bump_package_json(text, "qs", "6.10.3")
+    assert json.loads(out)["overrides"] == {"semver": "^7.5.2", "qs": "^6.10.3"}
+
+
+def test_odd_overrides_field_is_left_to_a_human():
+    with pytest.raises(FixError, match="overrides"):
+        fixes.bump_package_json('{"overrides": "nope"}', "qs", "6.10.3")
 
 
 def test_bump_requirements_keeps_extras_and_comments():
