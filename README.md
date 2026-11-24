@@ -121,7 +121,7 @@ private repositories, create a GitHub App: see [Connect GitHub](backend/README.m
 - [x] Code pipeline: sandboxed scans, vulnerable dependencies, hygiene checks
 - [x] Engineering Health Score and Pickle's daily brief
 - [x] Connect GitHub: sign in, import repositories (private too), scan on push
-- [ ] Pull request checks
+- [x] Pull request checks
 - [x] Auto-fix pull requests (always waiting for human approval)
 - [x] Public status pages and README badges
 - [x] Email alerts and a weekly digest
