@@ -6,6 +6,7 @@ import { LineChart } from '../components/LineChart';
 import { RiceBall } from '../components/RiceBall';
 import { ProjectDrawer } from './dashboard/ProjectDrawer';
 import { NewProjectDialog } from './dashboard/NewProjectDialog';
+import { EmailSettingsDialog } from './dashboard/EmailSettingsDialog';
 import logoSrc from '../assets/logo.png';
 import './Dashboard.css';
 
@@ -112,6 +113,7 @@ export default function Dashboard() {
 function TopBar({ data, system, onNew }: { data: DashboardData | null; system: SystemHealth | null; onNew: () => void }) {
   const navigate = useNavigate();
   const [menu, setMenu] = useState(false);
+  const [emailSettings, setEmailSettings] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -153,11 +155,13 @@ function TopBar({ data, system, onNew }: { data: DashboardData | null; system: S
                 <strong>{data.user.name || firstName(null, data.user.email)}</strong>
                 <span>{data.user.email}</span>
               </div>
+              <button role="menuitem" onClick={() => { setMenu(false); setEmailSettings(true); }}>Email settings</button>
               <button role="menuitem" onClick={signOut}>Sign out</button>
             </div>
           )}
         </div>
       </div>
+      {emailSettings && <EmailSettingsDialog onClose={() => setEmailSettings(false)} />}
     </header>
   );
 }

@@ -207,6 +207,14 @@ export interface PublicStatus {
   resolvedIncidents: { kind: 'latency' | 'errors'; host: string; openedAt: string; closedAt: string }[];
 }
 
+export interface EmailSettings {
+  email: string;
+  deliverable: boolean;
+  incidentEmails: boolean;
+  weeklyDigest: boolean;
+  emailConfigured: boolean;
+}
+
 export interface SystemHealth {
   status: 'ok' | 'degraded';
   workers: Record<string, { instances: number; status: 'ok' | 'down' }>;
