@@ -195,6 +195,8 @@ async def test_vulnerabilities_from_osv(tmp_path):
     seen = {}
 
     def handler(request):
+        if request.url.path.startswith("/v1/vulns/"):  # advisory details: its own severity rating
+            return httpx.Response(200, json={"database_specific": {"severity": "CRITICAL"}})
         seen["queries"] = json.loads(request.content)["queries"]
         return httpx.Response(200, json={"results": [{"vulns": [{"id": "GHSA-1"}, {"id": "GHSA-2"}, {"id": "GHSA-3"}]}, {}]})
 
@@ -261,3 +263,43 @@ async def test_run_checks_offline_sorts_worst_first(tmp_path):
     found = await run_checks(tmp_path, files, None)
     assert found[0]["severity"] == "critical"
     assert keys(found) == keys(local_checks(tmp_path, files))
+
+
+async def test_vulnerabilities_use_the_advisories_own_severity(tmp_path):
+    write(tmp_path, {
+        "package-lock.json": json.dumps({"packages": {
+            "node_modules/vite": {"version": "7.3.1", "dev": True},
+            "node_modules/express": {"version": "4.0.0"},
+        }}),
+    })
+    severities = {"GHSA-A": "MODERATE", "GHSA-B": "HIGH", "GHSA-C": "LOW", "GHSA-D": "CRITICAL"}
+
+    def handler(request):
+        if request.url.path == "/v1/querybatch":
+            return httpx.Response(200, json={"results": [
+                {"vulns": [{"id": "GHSA-A"}, {"id": "GHSA-B"}, {"id": "GHSA-C"}]},  # vite: worst high, dev-only
+                {"vulns": [{"id": "GHSA-D"}]},  # express: critical
+            ]})
+        vid = request.url.path.rsplit("/", 1)[-1]
+        return httpx.Response(200, json={"id": vid, "database_specific": {"severity": severities[vid]}})
+
+    cache = MemoryCache()
+    async with mock_client(handler) as http:
+        found = {f["key"]: f for f in await vulnerabilities(tmp_path, http, cache)}
+    assert found["vuln:npm:vite"]["severity"] == "medium"  # high, one level lower because it's dev-only
+    assert "development-only" in found["vuln:npm:vite"]["detail"]
+    assert found["vuln:npm:express"]["severity"] == "critical"
+    assert await cache.get("osv:severity:GHSA-B") == "high"
+
+
+async def test_advisory_details_unavailable_assumes_high(tmp_path):
+    write(tmp_path, {"requirements.txt": "requests==2.19.0\n"})
+
+    def handler(request):
+        if request.url.path == "/v1/querybatch":
+            return httpx.Response(200, json={"results": [{"vulns": [{"id": "GHSA-X"}]}]})
+        return httpx.Response(503)
+
+    async with mock_client(handler) as http:
+        (f,) = await vulnerabilities(tmp_path, http, MemoryCache())
+    assert f["severity"] == "high"

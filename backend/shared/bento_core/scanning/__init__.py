@@ -39,7 +39,7 @@ def local_checks(root: Path, files: list[str]) -> list[dict]:
 
 async def network_checks(root: Path, http: httpx.AsyncClient, cache, facts: dict | None = None) -> list[dict]:
     """Checks that look dependencies up online: OSV advisories and registry versions."""
-    vulns, old = await asyncio.gather(vulnerabilities(root, http), outdated(root, http, cache, facts))
+    vulns, old = await asyncio.gather(vulnerabilities(root, http, cache), outdated(root, http, cache, facts))
     return vulns + old
 
 
