@@ -244,3 +244,32 @@ def test_fix_requests(client, user, db):
         return await state.redis.xlen("fix.jobs")
 
     assert db(fix_jobs) == 1
+
+
+# ---------- PR checks ----------
+
+def pr_event(action="opened", repo="Acme/Shop", head="h" * 40, inst=99):
+    return {"action": action, "installation": {"id": inst}, "repository": {"full_name": repo},
+            "pull_request": {"number": 12, "head": {"sha": head, "ref": "feature/x"}, "base": {"sha": "b" * 40, "ref": "main"}}}
+
+
+def test_pull_request_webhook_queues_one_check_per_commit(client, user, db):
+    headers, _ = user()
+    p = client.post("/api/projects", headers=headers, json={"name": "Shop", "repo_url": "https://github.com/acme/shop"}).json()["project"]
+
+    assert signed(client, "pull_request", pr_event()).json()["ignored"] == "repository not imported in Bento"
+
+    async def link(state):
+        await state.pg.execute("UPDATE projects SET installation_id = 99 WHERE id = $1::uuid", p["id"])
+
+    async def pr_jobs(state):
+        return [json.loads(f["data"]) for _, f in await state.redis.xrange("scan.jobs") if '"pr"' in f["data"]]
+
+    db(link)
+    assert signed(client, "pull_request", pr_event()).json()["queued"] == "pr-check"
+    assert signed(client, "pull_request", pr_event()).json()["ignored"] == "already checking this commit"
+    assert signed(client, "pull_request", pr_event("synchronize", head="c" * 40)).json()["queued"] == "pr-check"
+    assert signed(client, "pull_request", pr_event("labeled", head="d" * 40)).json()["ignored"] == "pull_request"
+    jobs = db(pr_jobs)
+    assert [(j["head_sha"][0], j["base_sha"][0], j["installation_id"], j["repo"]) for j in jobs] == [
+        ("h", "b", 99, "acme/shop"), ("c", "b", 99, "acme/shop")]
