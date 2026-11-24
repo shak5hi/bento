@@ -8,6 +8,7 @@
 """
 
 import asyncio
+import json
 import os
 import shutil
 import tempfile
@@ -15,7 +16,7 @@ from pathlib import Path
 
 import httpx
 
-from bento_core import github, streams
+from bento_core import github, prcheck, streams
 from bento_core.config import settings
 from bento_core.db import create_pool
 from bento_core.log import setup_logging
@@ -80,6 +81,9 @@ class Scanner:
             await self.run(job)
 
     async def run(self, job: dict) -> None:
+        if job.get("kind") == "pr":
+            await self.pr_check(job)
+            return
         project = await self.pg.fetchrow(
             "SELECT id, owner_id, name, repo_url, installation_id FROM projects WHERE id = $1", job["project_id"]
         )
@@ -131,6 +135,65 @@ class Scanner:
             return
 
         log.info("scanning %s@%s in sandbox (delivery %s)", name, sha[:7], job.get("delivery"))
+        try:
+            found, facts = await self.scan_commit(url, sha, auth)
+        except ScanError as exc:
+            await self.pg.execute(
+                "UPDATE scans SET status = 'failed', error = $3, finished_at = now() WHERE project_id = $1 AND sha = $2",
+                project["id"], sha, str(exc),
+            )
+            await self.fail(project, str(exc))
+            return
+
+        new, resolved = await self.save(project["id"], sha, found, facts)
+        log.info("done %s@%s: %d findings (%d new, %d resolved)", name, sha[:7], len(found), new, resolved)
+        await self.note(project, "scan", "Scan finished",
+                        f"{sha[:7]}: {len(found)} open finding{'s' if len(found) != 1 else ''}, {new} new, {resolved} resolved")
+        await streams.publish(self.r, streams.ADVICE_REQUESTS, {"project_id": str(project["id"])})
+
+    async def pr_check(self, job: dict) -> None:
+        """A pull request's head vs its base -> the "Bento" check run. Nothing is saved as project findings."""
+        repo, inst, head, base = job["repo"], int(job["installation_id"]), job["head_sha"], job["base_sha"]
+        url = f"https://github.com/{repo}"
+        try:
+            check_id = await github.create_check_run(
+                repo, inst, head, prcheck.CHECK_NAME, self.http, details_url=f"{settings.public_url}/dashboard"
+            )
+            auth = github.git_auth_header(await github.installation_token(inst, self.http))
+        except github.GitHubError as exc:
+            log.warning("PR check on %s#%s not started: %s", repo, job.get("pr_number"), exc)
+            return
+        log.info("PR check %s#%s: %s vs base %s", repo, job.get("pr_number"), head[:7], base[:7])
+        try:
+            base_findings = await self.cached_scan(url, base, auth)
+            head_findings = await self.cached_scan(url, head, auth)
+            diff = prcheck.compare(base_findings, head_findings)
+            outcome, out = prcheck.conclusion(diff), prcheck.report(diff)
+        except Exception as exc:  # noqa: BLE001 - whatever happens, the check run must not stay "in progress"
+            # Bento failing to scan must never block someone's PR: report it as neutral.
+            if not isinstance(exc, ScanError):
+                log.exception("PR check on %s#%s crashed", repo, job.get("pr_number"))
+                exc = "an internal error; try pushing again"
+            outcome = "neutral"
+            out = {"title": "Bento couldn't scan this pull request", "summary": f"The scan didn't finish: {exc}"}
+        try:
+            await github.complete_check_run(repo, inst, check_id, outcome, out["title"], out["summary"], self.http)
+        except github.GitHubError as exc:
+            log.warning("PR check on %s#%s not reported: %s", repo, job.get("pr_number"), exc)
+            return
+        log.info("PR check %s#%s: %s (%s)", repo, job.get("pr_number"), outcome, out["title"])
+
+    async def cached_scan(self, url: str, sha: str, auth: str | None) -> list[dict]:
+        """Findings for one commit, cached for a day: a PR's base is shared by every push to it."""
+        key = f"prscan:{url}:{sha}"
+        if hit := await self.r.get(key):
+            return json.loads(hit)
+        found, _ = await self.scan_commit(url, sha, auth)
+        await self.r.set(key, json.dumps(found), ex=86400)
+        return found
+
+    async def scan_commit(self, url: str, sha: str, auth: str | None) -> tuple[list[dict], dict]:
+        """Fetch exactly one commit into a throwaway directory and run every check. Code is never executed."""
         workdir = tempfile.mkdtemp(prefix="scan-")
         try:
             await git("init", "--quiet", workdir)
@@ -141,22 +204,9 @@ class Scanner:
                 raise ScanError(f"repository is larger than {MAX_REPO_MB} MB")
             # the same checks the `bento scan` CLI runs (bento_core.scanning)
             facts: dict = {}
-            found = await run_checks(root, list_files(root), self.http, cache=self.r, facts=facts)
-        except ScanError as exc:
-            await self.pg.execute(
-                "UPDATE scans SET status = 'failed', error = $3, finished_at = now() WHERE project_id = $1 AND sha = $2",
-                project["id"], sha, str(exc),
-            )
-            await self.fail(project, str(exc))
-            return
+            return await run_checks(root, list_files(root), self.http, cache=self.r, facts=facts), facts
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
-
-        new, resolved = await self.save(project["id"], sha, found, facts)
-        log.info("done %s@%s: %d findings (%d new, %d resolved)", name, sha[:7], len(found), new, resolved)
-        await self.note(project, "scan", "Scan finished",
-                        f"{sha[:7]}: {len(found)} open finding{'s' if len(found) != 1 else ''}, {new} new, {resolved} resolved")
-        await streams.publish(self.r, streams.ADVICE_REQUESTS, {"project_id": str(project["id"])})
 
     async def save(self, project_id, sha: str, found: list[dict], facts: dict | None = None) -> tuple[int, int]:
         keys = [f["key"] for f in found]

@@ -83,10 +83,15 @@ async def _installation_event(event: str, payload: dict) -> dict:
     return {"ok": True, "event": event, "action": action}
 
 
+PR_CHECK_ACTIONS = {"opened", "synchronize", "reopened"}
+
+
 async def _pull_request_event(payload: dict) -> dict:
-    """Track Bento's fix PRs: when one is merged or closed, the drawer offers the button again if needed."""
+    """Opened/updated PRs get a Bento check run; closed Bento fix PRs are marked merged or closed."""
     pr = payload.get("pull_request") or {}
     full_name = (payload.get("repository", {}).get("full_name") or "").lower()
+    if payload.get("action") in PR_CHECK_ACTIONS:
+        return await _queue_pr_check(payload, pr, full_name)
     if payload.get("action") != "closed" or not (pr.get("head", {}).get("ref") or "").startswith("bento/"):
         return {"ok": True, "ignored": "pull_request"}
     status = "merged" if pr.get("merged") else "closed"
@@ -97,3 +102,24 @@ async def _pull_request_event(payload: dict) -> dict:
     )
     log.info("fix PR %s#%s %s (%s)", full_name, pr.get("number"), status, result)
     return {"ok": True, "pr": pr.get("number"), "status": status}
+
+
+async def _queue_pr_check(payload: dict, pr: dict, full_name: str) -> dict:
+    inst = (payload.get("installation") or {}).get("id")
+    head, base = (pr.get("head") or {}).get("sha"), (pr.get("base") or {}).get("sha")
+    if not (inst and head and base and full_name):
+        return {"ok": True, "ignored": "pull_request without installation or commits"}
+    imported = await state.pg.fetchval(
+        "SELECT 1 FROM projects WHERE repo_full_name = $1 AND installation_id IS NOT NULL LIMIT 1", full_name
+    )
+    if not imported:
+        return {"ok": True, "ignored": "repository not imported in Bento"}
+    # GitHub redelivers webhooks: one check per head commit
+    if not await state.redis.set(f"prcheck:{full_name}:{head}", "1", nx=True, ex=3600):
+        return {"ok": True, "ignored": "already checking this commit"}
+    await streams.publish(state.redis, streams.SCAN_JOBS, {
+        "kind": "pr", "repo": full_name, "installation_id": inst, "head_sha": head, "base_sha": base,
+        "pr_number": pr.get("number"),
+    })
+    log.info("PR %s#%s @%s -> check queued", full_name, pr.get("number"), head[:7])
+    return {"ok": True, "queued": "pr-check"}
