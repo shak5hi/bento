@@ -357,3 +357,54 @@ def test_weekly_digest_is_sent_once_per_week(client, user, db, monkeypatch):
 
     client.put("/api/me/email", headers=headers, json={"weeklyDigest": False})
     assert db(run, datetime(2026, 12, 7, 9, 0, tzinfo=timezone.utc)) == 0  # switched off
+
+
+# ---------- Pickle (advisor) with a mocked local model ----------
+
+def test_pickle_uses_the_model_and_falls_back_to_rules(client, user, db):
+    import httpx
+
+    from helpers import load_service
+
+    advisor = load_service("advisor")
+    headers, _ = user()
+    p = create(client, headers, name="Shop", repo_url="https://github.com/acme/pickle")
+
+    async def seed(state):
+        await state.pg.execute(
+            """INSERT INTO findings (project_id, key, severity, title, detail) VALUES
+               ($1::uuid, 'secret:aws-access-key:cfg.py', 'critical', 'AWS access key ID committed in cfg.py', 'Found on line 1'),
+               ($1::uuid, 'no-ci', 'low', 'No CI pipeline', 'Nothing builds')""",
+            p["id"],
+        )
+
+    def model(reply):
+        def handler(request):
+            if isinstance(reply, Exception):
+                raise reply
+            return httpx.Response(200, json={"message": {"content": json.dumps(reply)}})
+        return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+    async def advise(state, http, force=False):
+        await advisor.Advisor(state.pg, http, "http://ollama", "qwen2.5:1.5b").advise(p["id"], force=force)
+
+    db(seed)
+    db(advise, model(httpx.ConnectError("model still downloading")))
+    pickle = client.get(f"/api/projects/{p['id']}", headers=headers).json()["advice"]
+    assert pickle["source"] == "rules"
+    first = pickle["recommendations"][0]
+    assert first["title"] == "AWS access key ID committed in cfg.py" and first["steps"]  # guide steps, even without the model
+    assert "guide" not in first
+
+    reply = {"brief": "Shop has a leaked AWS key. Replace it first, then add CI.",
+             "plan": [{"why": "Bots look for keys like this.", "steps": ["Deactivate the key in AWS.", "Use an environment variable."]},
+                      {"why": "CI catches mistakes early.", "steps": ["Add a GitHub Actions workflow."]}]}
+    db(advise, model(reply), True)
+    pickle = client.get(f"/api/projects/{p['id']}", headers=headers).json()["advice"]
+    assert pickle["source"] == "ai:qwen2.5:1.5b" and pickle["brief"].startswith("Shop has a leaked AWS key")
+    assert [r["title"] for r in pickle["recommendations"]] == ["AWS access key ID committed in cfg.py", "No CI pipeline"]
+    assert pickle["recommendations"][0]["steps"] == ["Deactivate the key in AWS.", "Use an environment variable."]
+
+    detail = client.get(f"/api/projects/{p['id']}", headers=headers).json()
+    guide = next(f for f in detail["findings"] if f["title"].startswith("AWS"))["guide"]
+    assert "cfg.py" in guide["what"] and guide["steps"]

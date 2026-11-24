@@ -32,6 +32,9 @@ class Settings:
     # Where browsers reach Bento (used to build OAuth redirect URLs)
     public_url = (_env("PUBLIC_URL", "http://localhost:8080") or "").rstrip("/")
     slack_webhook_url = _env("SLACK_WEBHOOK_URL")
+    # Pickle's writer: a small open model served locally by Ollama. Empty OLLAMA_URL = rule-based text only.
+    ollama_url = (_env("OLLAMA_URL", "http://ollama:11434") or "").rstrip("/")
+    pickle_model = _env("PICKLE_MODEL", "qwen2.5:1.5b")
     # Email (Resend). Without RESEND_API_KEY emails are skipped with a log line; everything else works.
     resend_api_key = _env("RESEND_API_KEY")
     email_from = _env("EMAIL_FROM", "Bento <onboarding@resend.dev>")

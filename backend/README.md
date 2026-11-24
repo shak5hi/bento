@@ -16,7 +16,7 @@ CODE PIPELINE
   frontend ─┐
   GitHub ───┴─► api-gateway ──► scan.jobs ──► scanner ──► postgres ──► advice.requests ──► advisor (Pickle)
                FastAPI · JWT     (stream)    sandboxed      projects,                       cached by findings
-               HMAC webhooks                 dedupe by SHA  findings                        rule-based · cached
+               HMAC webhooks                 dedupe by SHA  findings                        rules + local AI · cached
 
 PROBE PIPELINE
   scheduler ──► probe.jobs ──► probers ×N ──► probe.results ──► analyzer ──► timescaledb (hypertable)
@@ -33,8 +33,9 @@ PROBE PIPELINE
 | **analyzer** | Batches results into TimescaleDB, keeps an EWMA latency/error baseline per endpoint, opens an incident after 3 breaching probes (latency z > 3 and > 250 ms; errors ≥ 20 % and unusual, or ≥ 50 % regardless) and closes it after 3 normal ones. Computes the Engineering Health Score every minute. If TimescaleDB rejects writes, the batch stays in the stream — nothing is dropped. |
 | **notifier** | Turns alerts into in-app notifications (and Slack if configured). Repeats for an open incident are suppressed for 30 minutes. |
 | **scanner** | Fetches exactly one commit (shallow, no hooks, size cap, unprivileged, tmpfs) and runs static checks: secrets in code (known token formats and high-entropy credentials; file and line only, the value is never stored), committed `.env` files, missing tests / CI / README / lockfile, known-vulnerable dependencies via [OSV](https://osv.dev), npm/PyPI dependencies a major version behind (registry lookups cached 6 h in Redis), and Dockerfile checks (unpinned base image, root user, ADD vs COPY, secrets in ENV/ARG, no HEALTHCHECK). Repository code is never executed. GitHub's duplicate deliveries are skipped by commit SHA; *Scan now* always rescans. |
-| **fixer** | Auto-fix pull requests. Consumes `fix.jobs` and, with the project's GitHub App installation token, creates a `bento/fix-<finding>` branch, one commit and a PR. Fixes: missing CI (workflow for the detected language), missing README, committed `.env` files (deleted, never read; the PR says to rotate the secrets), vulnerable npm/PyPI dependencies (bumped to the OSV fixed version; the PR says when a lockfile needs regenerating). It can't write any ref outside `bento/`, so the default branch is never touched and a human always merges. One open PR per finding. |
-| **advisor** | "Pickle". Rule-based: ranks a project's live incidents and code findings by severity and writes a short brief plus ≤ 3 recommendations. Skips the work when the findings hash is unchanged. No external AI service is used. |
+| **fixer** | Auto-fix pull requests. Consumes `fix.jobs` and, with the project's GitHub App installation token, creates a `bento/fix-<finding>` branch, one commit and a PR. Fixes: missing CI (workflow for the detected language), missing README, committed `.env` files (deleted, never read; the PR says to rotate the secrets), vulnerable npm/PyPI dependencies (bumped to the OSV fixed version, or an npm `overrides` entry when another package pulls it in; the PR says when a lockfile needs regenerating). It can't write any ref outside `bento/`, so the default branch is never touched and a human always merges. One open PR per finding. |
+| **advisor** | "Pickle". Rules rank a project's live incidents and findings and pick ≤ 3, each with Bento's plain-language guide (`bento_core/guides.py`). A small open model running locally in the **ollama** container (default `qwen2.5:1.5b`, ~1 GB, downloaded on first start) rewrites that plan for students, using only those facts and a fixed JSON format; anything slow, missing or malformed falls back to the rule-based text, item by item. Cached by a hash of the findings, model and prompt; advice written before the model was ready is upgraded once it is. No hosted AI service. On a laptop CPU one plan takes a few minutes, in the background. |
+| **ollama** | Serves Pickle's model on the internal network only. Set `OLLAMA_URL=` (empty) to run Pickle on rules alone. |
 
 **Data stores:** Postgres (users, projects, endpoints, scans, findings, incidents, advice, notifications) ·
 TimescaleDB (`probe_results`, `project_health` hypertables, retention policies) · Redis (streams, schedule, EWMA state, dedup keys, rate limits).
@@ -115,6 +116,7 @@ repository, the frontend lint/typecheck/build and a `docker compose build`.
 | `POSTGRES_PASSWORD` | database password for both Postgres and TimescaleDB |
 | `GITHUB_WEBHOOK_SECRET` | enables `/api/webhooks/github`; use the same value in the GitHub webhook settings |
 | `SLACK_WEBHOOK_URL` | also send incident alerts to Slack |
+| `OLLAMA_URL` · `PICKLE_MODEL` | Pickle's local model (default `http://ollama:11434`, `qwen2.5:1.5b`). Empty `OLLAMA_URL` = rule-based text only; any Ollama model name works, e.g. `llama3.2:3b` for better writing on a stronger machine |
 | `RESEND_API_KEY` | turns on email (incident alerts, Monday digest) through [Resend](https://resend.com); without it emails are skipped with a log line |
 | `EMAIL_FROM` | sender, e.g. `Bento <alerts@yourdomain.com>` (a domain verified in Resend). Default `Bento <onboarding@resend.dev>`, which Resend only delivers to your own account's address |
 | `DIGEST_TIMEZONE` · `DIGEST_HOUR` | when the weekly digest goes out: Monday at this hour (default `UTC`, `8`; e.g. `Asia/Kolkata`) |

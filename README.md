@@ -30,7 +30,7 @@ three things to do today, not fifty alerts.
 CODE PIPELINE
   GitHub push ─┐
   dashboard  ──┴─► api-gateway ──► scan.jobs ──► scanner ──► findings ──► advisor (Pickle)
-                   FastAPI · JWT                 sandboxed               rule-based, cached
+                   FastAPI · JWT                 sandboxed               rules + local AI
                    GitHub App                    clone, OSV
 
 PROBE PIPELINE
@@ -47,10 +47,11 @@ PROBE PIPELINE
 4. **Grade.** Four report cards (**Security**, **Website**, **Code basics** and **Upkeep**) roll up into one
    0–100 score and an A–F grade. A leaked secret caps the grade, anything not measured says so, and every
    project shows the one fix that would raise its score most.
-5. **Explain.** Pickle ranks incidents and findings by severity and writes a brief plus at most three
-   recommendations. It is rule-based: no external AI service.
+5. **Explain.** Pickle's rules rank incidents and findings and pick the top three; a small open AI model
+   running on your own machine (Ollama) explains them in plain words, with step-by-step fixes. No hosted AI
+   service, nothing leaves the machine, and the rule-based text is used whenever the model isn't available.
 
-Eight Python services talk over **Redis Streams** with consumer groups, so work survives crashes (unacked jobs
+Eight Python services and a local AI model talk over **Redis Streams** with consumer groups, so work survives crashes (unacked jobs
 are reclaimed after 30 s) and probers scale horizontally. Details: [`backend/README.md`](backend/README.md).
 
 ## Frontend
@@ -90,7 +91,7 @@ bento/
 ├── cli/                   `bento scan`: the scanner's checks on the command line (pip install ./cli)
 ├── action.yml             GitHub Action that runs `bento scan`
 ├── backend/
-│   ├── docker-compose.yml the whole stack (13 containers)
+│   ├── docker-compose.yml the whole stack (14 containers)
 │   ├── services/
 │   │   ├── api/           FastAPI gateway: auth, GitHub App, projects, dashboard, webhooks
 │   │   ├── scheduler/     probe schedule (Redis ZSET, jittered)
@@ -98,7 +99,7 @@ bento/
 │   │   ├── analyzer/      EWMA anomaly detection, incidents, health scores
 │   │   ├── notifier/      alerts with dedup and cooldown
 │   │   ├── scanner/       sandboxed repository scans
-│   │   ├── advisor/       Pickle
+│   │   ├── advisor/       Pickle: rules decide, a local open model explains
 │   │   └── fixer/         auto-fix pull requests (never touches the default branch)
 │   └── shared/bento_core/ config, DB pools, streams, scoring, GitHub client
 └── screenshots/

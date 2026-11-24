@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from bento_core import github, streams
 from bento_core.config import settings
+from bento_core.guides import guide_for
 from bento_core.net import probe_target_error, repo_full_name, repo_url_error
 from bento_core.scoring import status_for
 
@@ -215,12 +216,14 @@ async def get_project(project_id: UUID, user_id: UUID = Depends(current_user_id)
         "findings": [
             {
                 "id": str(f["id"]),
+                "key": f["key"],
                 "severity": f["severity"],
                 "title": f["title"],
                 "detail": f["detail"],
                 "effortMinutes": f["effort_minutes"],
                 "firstSeen": f["first_seen"],
                 "fixable": can_fix and github.fixable_finding(f["key"]),
+                "guide": guide_for(f["key"]),  # what's wrong / why it matters / how to fix, in plain words
                 "fix": (
                     {
                         "status": fx["status"],
@@ -252,6 +255,7 @@ async def get_project(project_id: UUID, user_id: UUID = Depends(current_user_id)
                 "brief": advice["brief"],
                 "recommendations": advice["recommendations"],
                 "generatedAt": advice["generated_at"],
+                "source": advice["source"],  # "rules" or "ai:<model>"
             }
             if advice
             else None

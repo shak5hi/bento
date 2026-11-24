@@ -11,6 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
+from bento_core import github
 from bento_core.scoring import status_for
 
 from ..security import current_user_id
@@ -52,7 +53,10 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
     user = await state.pg.fetchrow("SELECT name, email FROM users WHERE id = $1", user_id)
 
     projects = await state.pg.fetch(
-        """SELECT p.id, p.name, p.repo_url, p.last_scan_at, s.total, s.basis, s.grade, s.next_action,
+        """SELECT p.id, p.name, p.repo_url, p.last_scan_at, p.installation_id, s.total, s.basis, s.grade, s.next_action,
+                  s.cards,
+                  (SELECT f.id FROM findings f WHERE f.project_id = p.id AND f.status = 'open'
+                     AND f.key = s.next_action->>'key')                                                 AS next_finding_id,
                   (SELECT count(*) FROM endpoints e WHERE e.project_id = p.id)                         AS endpoints,
                   (SELECT count(*) FROM incidents i WHERE i.project_id = p.id AND i.status = 'open')    AS open_incidents,
                   (SELECT count(*) FROM findings f WHERE f.project_id = p.id AND f.status = 'open')     AS open_findings
@@ -74,7 +78,7 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
         user_id,
     )
     advice = await state.pg.fetch(
-        """SELECT a.project_id, a.brief, a.recommendations, a.generated_at
+        """SELECT a.project_id, a.brief, a.recommendations, a.generated_at, a.source
              FROM advice a JOIN projects p ON p.id = a.project_id WHERE p.owner_id = $1""",
         user_id,
     )
@@ -133,7 +137,23 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
                 "health": p["total"],
                 "grade": p["grade"],
                 "weekChange": weeks.get(p["id"]),
-                "nextAction": p["next_action"],
+                "nextAction": (
+                    {
+                        **p["next_action"],
+                        # so the overview can act on it directly
+                        "findingId": str(p["next_finding_id"]) if p["next_finding_id"] else None,
+                        "fixable": p["installation_id"] is not None and github.fixable_finding(p["next_action"]["key"]),
+                    }
+                    if p["next_action"]
+                    else None
+                ),
+                # the four report cards as grades, for the overview's tray
+                "cards": (
+                    {k: {"grade": c.get("grade"), "state": c.get("state"), "summary": c.get("summary")}
+                     for k, c in p["cards"].items()}
+                    if p["cards"]
+                    else None
+                ),
                 "basis": p["basis"],
                 "status": status_for(p["total"]),
                 "endpoints": p["endpoints"],
@@ -175,6 +195,7 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
                 "brief": a["brief"],
                 "recommendations": a["recommendations"],
                 "generatedAt": a["generated_at"],
+                "source": a["source"],
             }
             for a in advice
         ],

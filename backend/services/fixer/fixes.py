@@ -262,21 +262,33 @@ async def fixed_version(eco: str, name: str, current: str, http: httpx.AsyncClie
     return str(max(needed)), unfixed
 
 
-def bump_package_json(text: str, name: str, version: str) -> str:
+def _indent(text: str) -> int | str:
+    m = re.search(r"\n([ \t]+)\S", text)
+    if not m:
+        return 2
+    return "\t" if m.group(1).startswith("\t") else len(m.group(1))
+
+
+def bump_package_json(text: str, name: str, version: str) -> tuple[str, bool]:
+    """(new package.json, transitive). A direct dependency's version is bumped in place, keeping the file's
+    formatting. A package that only comes in through another one gets an npm `overrides` entry instead
+    (npm 8.3+), which makes every copy of it at least the fixed version."""
     data = json.loads(text)
     sections = [s for s in ("dependencies", "devDependencies", "optionalDependencies") if name in (data.get(s) or {})]
-    if not sections:
-        raise FixError(
-            f"{name} is not a direct dependency (it comes in through another package), so package.json can't bump it. "
-            f"Upgrade the package that depends on it, or run `npm audit fix`."
-        )
-    out = text
-    for s in sections:
-        old = data[s][name]
-        prefix = re.match(r"^[\^~]?", old).group(0)
-        pattern = re.compile(r'("' + re.escape(name) + r'"\s*:\s*")' + re.escape(old) + '"')
-        out = pattern.sub(lambda m: m.group(1) + prefix + version + '"', out)
-    return out
+    if sections:
+        out = text
+        for s in sections:
+            old = data[s][name]
+            prefix = re.match(r"^[\^~]?", old).group(0)
+            pattern = re.compile(r'("' + re.escape(name) + r'"\s*:\s*")' + re.escape(old) + '"')
+            out = pattern.sub(lambda m: m.group(1) + prefix + version + '"', out)
+        return out, False
+    overrides = data.get("overrides")
+    if overrides is not None and not isinstance(overrides, dict):
+        raise FixError("package.json has an overrides field Bento doesn't understand; add the override by hand.")
+    data["overrides"] = {**(overrides or {}), name: f"^{version}"}
+    out = json.dumps(data, indent=_indent(text), ensure_ascii=False)
+    return out + ("\n" if text.endswith("\n") else ""), True
 
 
 def _norm(name: str) -> str:
