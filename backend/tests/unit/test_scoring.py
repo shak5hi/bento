@@ -187,10 +187,19 @@ def test_change_reasons():
 def test_security_comes_first_while_it_caps_the_score():
     findings = [f("secret:private-key:a.key", "critical", "Private key in a.key", effort=30),
                 f("secret:generic-secret:b.js", "high", "Password in b.js", effort=20),
+                f("vuln:npm:vite", "high", "vite 7.3.1 has 10 known vulnerabilities"),
                 f("outdated:npm", "medium", meta={"behind": 5}), f("no-ci", effort=30)]
     result = score_project(findings, GOOD_SITE, endpoints=1, scanned=True, facts={"deps_checked": {"npm": 10}})
     nxt = result["next"]
     assert nxt["key"] == "secret:private-key:a.key"
-    assert nxt["title"].startswith("Fix the 2 security problems") and nxt["gain"] > 0 and nxt["effortMinutes"] == 50
+    assert nxt["title"] == "Remove 2 leaked secrets, starting with: Private key in a.key" and nxt["effortMinutes"] == 50
+    # the vulnerable library still holds Security at D, so fixing the secrets lifts the score to the D cap
     fixed = [x for x in findings if not x["key"].startswith("secret:")]
     assert score_project(fixed, GOOD_SITE, 1, True, {"deps_checked": {"npm": 10}})["total"] - result["total"] == nxt["gain"]
+
+
+def test_vulnerable_libraries_are_one_task_when_they_are_the_worst():
+    findings = [f(f"vuln:npm:lib{i}", "critical" if i == 0 else "medium", f"lib{i} 1.0.0 has 2 known vulnerabilities")
+                for i in range(12)] + [f("secret:stripe-test-key:a.js", "medium", "Stripe test key in a.js")]
+    nxt = score_project(findings, None, 0, True, None)["next"]
+    assert nxt["title"] == "Update 12 vulnerable libraries, starting with lib0 1.0.0" and nxt["gain"] > 0  # Security C: cap lifted

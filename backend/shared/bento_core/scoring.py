@@ -211,19 +211,27 @@ def next_action(findings, probes, endpoints, scanned, facts, total) -> dict | No
     security = sorted((f for f in findings if category(f["key"]) == "security"),
                       key=lambda f: SEVERITY_ORDER.index(f["severity"]))
     if security and security_card(findings, scanned)["grade"] in CAPS:
-        rest = [g for g in findings if category(g["key"]) != "security"]
+        # Two kinds of security work: leaked secrets (rotate + remove) and vulnerable libraries (upgrade).
+        # Do the group holding the worst problem first; secrets win a tie.
+        secrets = [f for f in security if not f["key"].startswith("vuln:")]
+        libraries = [f for f in security if f["key"].startswith("vuln:")]
+        rank = lambda group: SEVERITY_ORDER.index(group[0]["severity"]) if group else 99  # noqa: E731
+        group = secrets if rank(secrets) <= rank(libraries) else libraries
+        rest = [g for g in findings if g not in group]
         cards = {
             "security": security_card(rest, scanned), "website": website_card(probes, endpoints),
             "basics": basics_card(rest, scanned), "upkeep": upkeep_card(rest, facts),
         }
         gain = (overall(cards)["total"] or 0) - (total or 0)
-        first = security[0]
-        if len(security) == 1:
+        first = group[0]
+        if len(group) == 1:
             title = first["title"]
+        elif group is secrets:
+            title = f"Remove {len(group)} leaked secrets, starting with: {first['title']}"
         else:
-            title = f"Fix the {len(security)} security problems, starting with: {first['title']}"
+            title = f"Update {len(group)} vulnerable libraries, starting with {first['title'].split(' has ')[0]}"
         return {"key": first["key"], "title": title, "gain": gain if gain > 0 else None,
-                "effortMinutes": sum(f.get("effort_minutes") or 20 for f in security)}
+                "effortMinutes": sum(f.get("effort_minutes") or 20 for f in group)}
     best = None
     for f in findings:
         rest = [g for g in findings if g is not f]
