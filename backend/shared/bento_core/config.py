@@ -32,6 +32,11 @@ class Settings:
     # Where browsers reach Bento (used to build OAuth redirect URLs)
     public_url = (_env("PUBLIC_URL", "http://localhost:8080") or "").rstrip("/")
     slack_webhook_url = _env("SLACK_WEBHOOK_URL")
+    # Email (Resend). Without RESEND_API_KEY emails are skipped with a log line; everything else works.
+    resend_api_key = _env("RESEND_API_KEY")
+    email_from = _env("EMAIL_FROM", "Bento <onboarding@resend.dev>")
+    digest_timezone = _env("DIGEST_TIMEZONE", "UTC")
+    digest_hour = int(_env("DIGEST_HOUR", "8"))  # Monday at this local hour
 
     default_probe_interval = int(_env("PROBE_INTERVAL_SECONDS", "60"))
     # Probing private/internal addresses is blocked unless explicitly allowed (SSRF protection).

@@ -75,6 +75,7 @@ services:
       <<: *env
       JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-jwt-secret-change-me}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:4000}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
@@ -112,6 +113,12 @@ services:
     environment:
       <<: *env
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      # Email alerts + weekly digest (see README). Unsubscribe links are signed with the same key as logins.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      DIGEST_TIMEZONE: ${DIGEST_TIMEZONE:-UTC}
+      DIGEST_HOUR: ${DIGEST_HOUR:-8}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-jwt-secret-change-me}
 
   # ─────────────── Code pipeline ───────────────
   scanner:
