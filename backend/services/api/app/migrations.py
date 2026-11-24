@@ -179,6 +179,11 @@ CREATE TABLE IF NOT EXISTS score_events (
   reason      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS score_events_project_idx ON score_events (project_id, at DESC);
+
+-- Email: per-user switches for incident alerts and the weekly digest, and the last digest's ISO week
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_incidents BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_digest BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_week TEXT;
 """
 
 TIMESCALE = """
