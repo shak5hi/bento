@@ -74,6 +74,8 @@ over the last week, and a `score_events` history explaining every change (*Fixed
 | `GET /public/status/{slug}` | public status page data, no login: score, uptime 24 h / 7 d / 30 d, p95 latency (24 h), open and recently resolved incidents. Never includes code findings. Rate-limited, cached 30 s |
 | `GET /badge/{slug}.svg` | README badge `bento health \| 94`, coloured by status. Private or unknown slugs get a grey `unknown` badge (never a 404). Cached 5 min |
 | `POST /webhooks/github` | push, pull request (PR checks, fix-PR tracking) + installation webhooks (needs `GITHUB_WEBHOOK_SECRET`) |
+| `GET/PUT /me/email` | email settings: incident alerts and weekly digest on/off |
+| `GET/POST /email/unsubscribe?token=` | signed one-click unsubscribe (the GET page has a button; POST unsubscribes) |
 | `GET /system` | pipeline status for the dashboard |
 
 **Public status page and badge.** In a project's drawer, switch on *Public status page*. The page lives at
@@ -113,6 +115,9 @@ repository, the frontend lint/typecheck/build and a `docker compose build`.
 | `POSTGRES_PASSWORD` | database password for both Postgres and TimescaleDB |
 | `GITHUB_WEBHOOK_SECRET` | enables `/api/webhooks/github`; use the same value in the GitHub webhook settings |
 | `SLACK_WEBHOOK_URL` | also send incident alerts to Slack |
+| `RESEND_API_KEY` | turns on email (incident alerts, Monday digest) through [Resend](https://resend.com); without it emails are skipped with a log line |
+| `EMAIL_FROM` | sender, e.g. `Bento <alerts@yourdomain.com>` (a domain verified in Resend). Default `Bento <onboarding@resend.dev>`, which Resend only delivers to your own account's address |
+| `DIGEST_TIMEZONE` · `DIGEST_HOUR` | when the weekly digest goes out: Monday at this hour (default `UTC`, `8`; e.g. `Asia/Kolkata`) |
 | `PROBER_REPLICAS` | number of prober workers (default 2) |
 | `PROBE_INTERVAL_SECONDS` | default probe interval (default 60) |
 | `ALLOW_PRIVATE_TARGETS` | `true` to allow probing localhost/private IPs (local testing only) |

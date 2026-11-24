@@ -124,7 +124,7 @@ private repositories, create a GitHub App: see [Connect GitHub](backend/README.m
 - [ ] Pull request checks
 - [x] Auto-fix pull requests (always waiting for human approval)
 - [x] Public status pages and README badges
-- [ ] Email alerts and a weekly digest
+- [x] Email alerts and a weekly digest
 - [x] Deeper scanning: secrets in code, outdated dependencies, Dockerfiles
 - [x] `bento` CLI and GitHub Action
 - [x] Test suite and CI
