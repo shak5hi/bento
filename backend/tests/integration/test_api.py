@@ -286,3 +286,74 @@ def test_same_repository_cannot_be_added_twice(client, user):
     # someone else may add the same repository to their own account
     theirs, _ = user()
     assert client.post("/api/projects", headers=theirs, json={"name": "Shop", "repo_url": "https://github.com/acme/shop"}).status_code == 201
+
+
+# ---------- email settings, unsubscribe, weekly digest ----------
+
+def test_email_settings_and_unsubscribe(client, user):
+    from bento_core import mail
+
+    headers, me = user()
+    s = client.get("/api/me/email", headers=headers).json()
+    assert s["incidentEmails"] is True and s["weeklyDigest"] is True and s["emailConfigured"] is False
+    s = client.put("/api/me/email", headers=headers, json={"weeklyDigest": False}).json()
+    assert s["weeklyDigest"] is False and s["incidentEmails"] is True
+    client.put("/api/me/email", headers=headers, json={"weeklyDigest": True})
+
+    token = mail.unsubscribe_token(me["id"], "incidents")
+    page = client.get("/api/email/unsubscribe", params={"token": token})
+    assert page.status_code == 200 and "Stop incident alerts?" in page.text and "<form" in page.text
+    assert client.get("/api/me/email", headers=headers).json()["incidentEmails"] is True  # opening the link isn't enough
+
+    done = client.post("/api/email/unsubscribe", content=f"token={token}", headers={"Content-Type": "application/x-www-form-urlencoded"})
+    assert done.status_code == 200 and "unsubscribed" in done.text
+    assert client.get("/api/me/email", headers=headers).json()["incidentEmails"] is False
+
+    # a mail app's own one-click button posts to the link itself (RFC 8058)
+    one_click = client.post(f"/api/email/unsubscribe?token={mail.unsubscribe_token(me['id'], 'digest')}",
+                            content="List-Unsubscribe=One-Click", headers={"Content-Type": "application/x-www-form-urlencoded"})
+    assert one_click.status_code == 200
+    assert client.get("/api/me/email", headers=headers).json()["weeklyDigest"] is False
+
+    login_token = headers["Authorization"].removeprefix("Bearer ")
+    assert client.post(f"/api/email/unsubscribe?token={login_token}").status_code == 400
+    assert "valid" in client.get("/api/email/unsubscribe", params={"token": "nope"}).text
+
+
+def test_weekly_digest_is_sent_once_per_week(client, user, db, monkeypatch):
+    from datetime import datetime, timezone
+    from uuid import UUID
+
+    from bento_core import mail
+    from bento_core.config import settings
+    from helpers import load_service
+
+    notifier = load_service("notifier")
+    headers, me = user()
+    _, quiet = user()  # has no projects: no digest
+    p = create(client, headers, name="Shop")
+    db(seed_scores, UUID(p["id"]), 81, [("high", "Leaked key")])
+    outbox = []
+
+    async def fake_send(http, to, subject, html_body, text, unsubscribe):
+        outbox.append({"to": to, "subject": subject, "html": html_body, "unsubscribe": unsubscribe})
+        return True
+
+    monkeypatch.setattr(mail, "send", fake_send)
+    monday = datetime(2026, 11, 30, 9, 0, tzinfo=timezone.utc)
+
+    async def run(state, now):
+        return await notifier.Notifier(state.pg, state.redis, None, state.ts).send_digests(now)
+
+    monkeypatch.setattr(settings, "resend_api_key", None)
+    assert db(run, monday) == 0 and outbox == []  # not configured: skipped, nobody's week claimed
+
+    monkeypatch.setattr(settings, "resend_api_key", "resend-key-for-tests")
+    assert db(run, monday) == 1
+    assert db(run, monday) == 0  # same week again: already sent
+    (msg,) = outbox
+    assert msg["to"] == me["email"] and msg["subject"].startswith("Your week in Bento: health 81")
+    assert "Leaked key" in msg["html"] and mail.read_unsubscribe_token(msg["unsubscribe"].split("token=")[1])[1] == "digest"
+
+    client.put("/api/me/email", headers=headers, json={"weeklyDigest": False})
+    assert db(run, datetime(2026, 12, 7, 9, 0, tzinfo=timezone.utc)) == 0  # switched off
