@@ -73,7 +73,7 @@ over the last week, and a `score_events` history explaining every change (*Fixed
 | `PUT /projects/{id}/public` | turn the public status page and badge on or off (`{"enabled": true}`); the slug is created once and kept |
 | `GET /public/status/{slug}` | public status page data, no login: score, uptime 24 h / 7 d / 30 d, p95 latency (24 h), open and recently resolved incidents. Never includes code findings. Rate-limited, cached 30 s |
 | `GET /badge/{slug}.svg` | README badge `bento health \| 94`, coloured by status. Private or unknown slugs get a grey `unknown` badge (never a 404). Cached 5 min |
-| `POST /webhooks/github` | push, pull request + installation webhooks (needs `GITHUB_WEBHOOK_SECRET`) |
+| `POST /webhooks/github` | push, pull request (PR checks, fix-PR tracking) + installation webhooks (needs `GITHUB_WEBHOOK_SECRET`) |
 | `GET /system` | pipeline status for the dashboard |
 
 **Public status page and badge.** In a project's drawer, switch on *Public status page*. The page lives at
@@ -157,6 +157,31 @@ settings Bento still works with public repository URLs.
 
 Sign-in works on `localhost` as-is (GitHub redirects your browser). Only push webhooks need a public URL - use a
 tunnel (`cloudflared tunnel --url http://localhost:8080`) locally, and update the app's webhook URL to match.
+
+## PR checks and webhooks (local)
+
+Push scans, PR checks and fix-PR tracking all arrive as GitHub webhooks, so GitHub must be able to reach your
+Bento. Locally, a free Cloudflare quick tunnel does that:
+
+1. Install cloudflared: `winget install --id Cloudflare.cloudflared` (macOS: `brew install cloudflared`).
+2. With Bento running, start the tunnel and leave the window open:
+   ```bash
+   cloudflared tunnel --url http://localhost:8080
+   ```
+   It prints an address like `https://some-random-words.trycloudflare.com`. A quick tunnel gets a new address
+   every time it starts, so repeat step 3's URL change after restarting it.
+3. In the GitHub App settings (**https://github.com/settings/apps** → your app → **General**), under **Webhook**:
+   tick **Active**, set **Webhook URL** to `https://<tunnel address>/api/webhooks/github`, and set
+   **Webhook secret** to a long random string you make yourself. Save.
+4. Put the same string in `backend/.env` as `GITHUB_WEBHOOK_SECRET=...` and run `docker compose up -d`.
+5. Under **Permissions & events**: *Checks* read & write, and subscribe to **Push** and **Pull request**. Save,
+   then accept the updated permissions on the installation (**https://github.com/settings/installations** →
+   *Configure*).
+6. Check it: **Advanced → Recent Deliveries** in the app settings should show a `ping` with a 200 response.
+
+When a pull request is opened or updated on an imported repository, Bento scans the PR's latest commit and its
+base, and posts a **Bento** check on the PR. It fails only if the PR *adds* critical or high problems, and lists
+what's new, what's fixed and what was already there. Secret values are never shown.
 
 ## Layout
 
