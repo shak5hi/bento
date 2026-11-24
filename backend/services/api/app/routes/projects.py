@@ -66,7 +66,7 @@ async def _queue_scan(project_id: UUID, reason: str, force: bool = False) -> Non
     await streams.publish(state.redis, streams.SCAN_JOBS, job)
 
 
-def project_json(row, score=None) -> dict:
+def project_json(row, score=None, week_change: int | None = None) -> dict:
     total = score["total"] if score else None
     return {
         "id": str(row["id"]),
@@ -79,27 +79,58 @@ def project_json(row, score=None) -> dict:
         "isPublic": row["is_public"],
         "publicSlug": row["public_slug"] if row["is_public"] else None,
         "health": total,
+        "grade": score["grade"] if score else None,
         "status": status_for(total),
-        "parts": (
-            {k: score[k] for k in ("uptime", "latency", "errors", "code")} | {"basis": score["basis"]} if score else None
-        ),
+        "basis": score["basis"] if score else None,
+        # report cards (bento_core.scoring): security, website, basics, upkeep, each explained
+        "cards": score["cards"] if score else None,
+        "nextAction": score["next_action"] if score else None,
+        "capped": score["capped"] if score else None,
+        "weekChange": week_change,
     }
 
 
 @router.get("/projects")
 async def list_projects(user_id: UUID = Depends(current_user_id)):
     rows = await state.pg.fetch(
-        """SELECT p.*, s.total, s.uptime, s.latency, s.errors, s.code, s.basis
+        """SELECT p.*, s.total, s.grade, s.cards, s.next_action, s.capped, s.basis
              FROM projects p LEFT JOIN project_scores s ON s.project_id = p.id
             WHERE p.owner_id = $1 ORDER BY p.created_at""",
         user_id,
     )
-    return {"projects": [project_json(r, r if r["total"] is not None else None) for r in rows]}
+    weeks = await week_changes([r["id"] for r in rows], {r["id"]: r["total"] for r in rows})
+    return {"projects": [project_json(r, r if r["total"] is not None else None, weeks.get(r["id"])) for r in rows]}
+
+
+async def week_changes(project_ids: list, totals: dict) -> dict:
+    """Score now minus the score about a week ago (the oldest reading in the last 7 days)."""
+    if not project_ids:
+        return {}
+    rows = await state.ts.fetch(
+        """SELECT DISTINCT ON (project_id) project_id, total FROM project_health
+            WHERE project_id = ANY($1::uuid[]) AND time > now() - interval '7 days'
+            ORDER BY project_id, time""",
+        project_ids,
+    )
+    return {r["project_id"]: totals[r["project_id"]] - r["total"] for r in rows if totals.get(r["project_id"]) is not None}
+
+
+async def _check_not_added(user_id: UUID, repo: str | None, except_id: UUID | None = None) -> None:
+    """One project per repository: re-adding it would just split its history in two."""
+    if not repo:
+        return
+    existing = await state.pg.fetchval(
+        "SELECT name FROM projects WHERE owner_id = $1 AND repo_full_name = $2 AND id IS DISTINCT FROM $3",
+        user_id, repo_full_name(repo), except_id,
+    )
+    if existing:
+        raise HTTPException(409, f"This repository is already in Bento as \"{existing}\"")
 
 
 @router.post("/projects", status_code=201)
 async def create_project(body: ProjectBody, user_id: UUID = Depends(current_user_id)):
     repo = _check_repo(body.repo_url)
+    await _check_not_added(user_id, repo)
     urls = list(dict.fromkeys(_check_endpoint(u) for u in body.endpoints if u.strip()))
     async with state.pg.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
@@ -169,8 +200,17 @@ async def get_project(project_id: UUID, user_id: UUID = Depends(current_user_id)
             "lastProbedAt": lp["time"] if lp else None,
         }
 
+    history = await state.pg.fetch(
+        "SELECT at, total, previous, grade, reason FROM score_events WHERE project_id = $1 ORDER BY at DESC LIMIT 20",
+        project_id,
+    )
+    weeks = await week_changes([project_id], {project_id: score["total"] if score else None})
     return {
-        "project": project_json(row, score),
+        "project": project_json(row, score, weeks.get(project_id)),
+        "history": [
+            {"at": h["at"], "total": h["total"], "previous": h["previous"], "grade": h["grade"], "reason": h["reason"]}
+            for h in history
+        ],
         "endpoints": [ep_json(e) for e in endpoints],
         "findings": [
             {
@@ -250,6 +290,8 @@ async def update_project(project_id: UUID, body: ProjectPatch, user_id: UUID = D
     fields = body.model_dump(exclude_unset=True)
     name = (fields.get("name") or current["name"]).strip()
     repo = _check_repo(fields["repo_url"]) if "repo_url" in fields else current["repo_url"]
+    if repo != current["repo_url"]:
+        await _check_not_added(user_id, repo, except_id=project_id)
     row = await state.pg.fetchrow(
         "UPDATE projects SET name = $3, repo_url = $4, repo_full_name = $5 WHERE id = $1 AND owner_id = $2 RETURNING *",
         project_id,

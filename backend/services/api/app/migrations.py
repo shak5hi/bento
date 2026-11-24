@@ -157,6 +157,28 @@ CREATE TABLE IF NOT EXISTS fix_prs (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS fix_prs_active_idx ON fix_prs (project_id, finding_key) WHERE status IN ('queued', 'open');
 CREATE INDEX IF NOT EXISTS fix_prs_pr_idx ON fix_prs (project_id, pr_number);
+
+-- Report-card scoring (bento_core.scoring): raw facts in, explained cards out
+ALTER TABLE findings ADD COLUMN IF NOT EXISTS meta JSONB;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS scan_facts JSONB;
+ALTER TABLE project_scores ADD COLUMN IF NOT EXISTS grade TEXT;
+ALTER TABLE project_scores ADD COLUMN IF NOT EXISTS cards JSONB;
+ALTER TABLE project_scores ADD COLUMN IF NOT EXISTS next_action JSONB;
+ALTER TABLE project_scores ADD COLUMN IF NOT EXISTS capped TEXT;
+ALTER TABLE project_scores ADD COLUMN IF NOT EXISTS inputs JSONB;
+ALTER TABLE project_scores ADD COLUMN IF NOT EXISTS formula TEXT;
+
+-- Every change of a project's score, with the reason ("Fixed: leaked key in config.js")
+CREATE TABLE IF NOT EXISTS score_events (
+  id          BIGSERIAL PRIMARY KEY,
+  project_id  UUID NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+  at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  total       INT NOT NULL,
+  previous    INT,
+  grade       TEXT,
+  reason      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS score_events_project_idx ON score_events (project_id, at DESC);
 """
 
 TIMESCALE = """

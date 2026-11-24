@@ -228,3 +228,61 @@ def test_badge_colours(client, user, db):
         db(seed_scores, UUID(p["id"]), total)
         slug = client.put(f"/api/projects/{p['id']}/public", headers=headers, json={"enabled": True}).json()["project"]["publicSlug"]
         assert colour in client.get(f"/api/badge/{slug}.svg").text
+
+
+# ---------- report cards (analyzer scoring against the real database) ----------
+
+def test_report_cards_history_and_week_change(client, user, db):
+    from uuid import UUID
+
+    from helpers import load_service
+
+    analyzer = load_service("analyzer")
+    headers, _ = user()
+    p = create(client, headers, repo_url="https://github.com/acme/cards")
+    pid = UUID(p["id"])
+
+    async def scanned_with(state, findings):
+        await state.pg.execute(
+            "UPDATE projects SET last_scan_at = now(), scan_facts = $2 WHERE id = $1", pid, {"deps_checked": {"npm": 20}}
+        )
+        await state.pg.execute("UPDATE findings SET status = 'resolved' WHERE project_id = $1", pid)
+        for key, sev, title in findings:
+            await state.pg.execute(
+                """INSERT INTO findings (project_id, key, severity, title) VALUES ($1, $2, $3, $4)
+                   ON CONFLICT (project_id, key) DO UPDATE SET status = 'open'""",
+                pid, key, sev, title,
+            )
+        await analyzer.Analyzer(state.pg, state.ts, state.redis).score_all()
+
+    db(scanned_with, [("secret:aws-access-key:config.js", "critical", "AWS key in config.js"), ("no-tests", "medium", "No tests")])
+    detail = client.get(f"/api/projects/{p['id']}", headers=headers).json()
+    proj = detail["project"]
+    assert proj["grade"] == "F" and proj["health"] <= 49 and "Security" in proj["capped"]
+    assert set(proj["cards"]) == {"security", "website", "basics", "upkeep"}
+    assert proj["cards"]["website"]["state"] == "not_monitored"
+    assert proj["nextAction"]["key"] == "secret:aws-access-key:config.js" and proj["nextAction"]["gain"] > 0
+    assert [h["reason"] for h in detail["history"]] == ["First score"]
+
+    db(scanned_with, [("no-tests", "medium", "No tests")])  # the key was removed
+    detail = client.get(f"/api/projects/{p['id']}", headers=headers).json()
+    assert detail["history"][0]["reason"] == "Fixed: AWS key in config.js"
+    assert detail["history"][0]["total"] > detail["history"][0]["previous"]
+    assert detail["project"]["weekChange"] == detail["history"][0]["total"] - detail["history"][1]["total"]
+
+    listed = client.get("/api/dashboard", headers=headers).json()["projects"][0]
+    assert listed["grade"] == detail["project"]["grade"] and listed["weekChange"] == detail["project"]["weekChange"]
+
+
+def test_same_repository_cannot_be_added_twice(client, user):
+    headers, _ = user()
+    first = create(client, headers, name="Shop", repo_url="https://github.com/acme/shop")
+    dup = client.post("/api/projects", headers=headers, json={"name": "Shop again", "repo_url": "https://github.com/Acme/Shop.git"})
+    assert dup.status_code == 409 and '"Shop"' in dup.json()["detail"]
+    other = create(client, headers, name="Other", repo_url="https://github.com/acme/other")
+    moved = client.patch(f"/api/projects/{other['id']}", headers=headers, json={"repo_url": "https://github.com/acme/shop"})
+    assert moved.status_code == 409
+    assert client.patch(f"/api/projects/{first['id']}", headers=headers, json={"name": "Renamed"}).status_code == 200
+    # someone else may add the same repository to their own account
+    theirs, _ = user()
+    assert client.post("/api/projects", headers=theirs, json={"name": "Shop", "repo_url": "https://github.com/acme/shop"}).status_code == 201

@@ -19,7 +19,7 @@ from bento_core import streams
 from bento_core.config import settings
 from bento_core.db import create_pool
 from bento_core.log import setup_logging
-from bento_core.scoring import health_score, status_for
+from bento_core.scoring import change_reason, score_project, status_for
 
 log = setup_logging()
 
@@ -160,45 +160,65 @@ class Analyzer:
             await asyncio.sleep(SCORE_EVERY_S)
 
     async def score_all(self) -> None:
-        projects = await self.pg.fetch("SELECT id, owner_id, last_scan_at FROM projects")
+        """Every minute: report cards + overall grade per project (bento_core.scoring).
+
+        Current score -> project_scores, history -> project_health (Timescale), and every change of
+        the total -> score_events with the reason, so the graph can say why it moved.
+        """
+        projects = await self.pg.fetch(
+            """SELECT p.id, p.owner_id, p.repo_url, p.last_scan_at, p.scan_facts,
+                      (SELECT count(*) FROM endpoints e WHERE e.project_id = p.id) AS endpoints,
+                      s.total AS prev_total, s.inputs AS prev_inputs
+                 FROM projects p LEFT JOIN project_scores s ON s.project_id = p.id"""
+        )
         if not projects:
             return
-        stats = {
-            r["project_id"]: r
+        probes = {
+            r["project_id"]: {"total": r["total"], "ok": r["ok"], "p95": r["p95"]}
             for r in await self.ts.fetch(
-                """SELECT project_id, count(*) AS total,
-                          count(*) FILTER (WHERE status IS NOT NULL) AS responded,
-                          count(*) FILTER (WHERE status >= 500) AS failed,
+                """SELECT project_id, count(*) AS total, count(*) FILTER (WHERE ok) AS ok,
                           percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE ok) AS p95
-                     FROM probe_results WHERE time > now() - interval '30 minutes'
+                     FROM probe_results WHERE time > now() - interval '7 days'
                     GROUP BY project_id"""
             )
         }
-        sev: dict = {}
-        for f in await self.pg.fetch("SELECT project_id, severity FROM findings WHERE status = 'open'"):
-            sev.setdefault(f["project_id"], []).append(f["severity"])
+        findings: dict = {}
+        for f in await self.pg.fetch(
+            "SELECT project_id, key, severity, title, effort_minutes, meta FROM findings WHERE status = 'open'"
+        ):
+            findings.setdefault(f["project_id"], []).append(dict(f))
 
         now = datetime.now(timezone.utc)
         history = []
         for p in projects:
-            s = stats.get(p["id"])
-            score = health_score(
-                s["total"] if s else 0, s["responded"] if s else 0, s["failed"] if s else 0,
-                s["p95"] if s else None, sev.get(p["id"], []), code_known=p["last_scan_at"] is not None,
+            scanned = bool(p["repo_url"]) and p["last_scan_at"] is not None
+            result = score_project(
+                findings.get(p["id"], []), probes.get(p["id"]), p["endpoints"], scanned, p["scan_facts"]
             )
-            if score is None:  # nothing measured yet: clear any stale score instead of inventing one
+            if result["total"] is None:  # nothing measured yet: clear any stale score instead of inventing one
                 await self.pg.execute("DELETE FROM project_scores WHERE project_id = $1", p["id"])
                 continue
-            prev = await self.pg.fetchval("SELECT total FROM project_scores WHERE project_id = $1", p["id"])
+            inputs = {
+                "findings": {f["key"]: f["title"] for f in findings.get(p["id"], [])},
+                "website": result["cards"]["website"]["grade"],
+            }
             await self.pg.execute(
-                """INSERT INTO project_scores (project_id, total, uptime, latency, errors, code, basis, computed_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, now())
-                   ON CONFLICT (project_id) DO UPDATE SET total = $2, uptime = $3, latency = $4, errors = $5,
-                     code = $6, basis = $7, computed_at = now()""",
-                p["id"], score.total, score.uptime, score.latency, score.errors, score.code, score.basis,
+                """INSERT INTO project_scores (project_id, total, grade, cards, next_action, capped, inputs, formula,
+                                               basis, uptime, latency, errors, code, computed_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, NULL, NULL, NULL, now())
+                   ON CONFLICT (project_id) DO UPDATE SET total = $2, grade = $3, cards = $4, next_action = $5,
+                     capped = $6, inputs = $7, formula = $8, basis = $9, computed_at = now()""",
+                p["id"], result["total"], result["grade"], result["cards"], result["next"], result["capped"],
+                inputs, result["formula"], result["basis"],
             )
-            history.append((now, p["id"], p["owner_id"], score.total))
-            if prev is not None and status_for(prev) != score.status:
+            history.append((now, p["id"], p["owner_id"], result["total"]))
+            if p["prev_total"] != result["total"]:
+                await self.pg.execute(
+                    "INSERT INTO score_events (project_id, total, previous, grade, reason) VALUES ($1, $2, $3, $4, $5)",
+                    p["id"], result["total"], p["prev_total"], result["grade"],
+                    change_reason(p["prev_inputs"] if p["prev_total"] is not None else None, inputs),
+                )
+            if p["prev_total"] is not None and status_for(p["prev_total"]) != status_for(result["total"]):
                 await streams.publish(self.r, streams.ADVICE_REQUESTS, {"project_id": str(p["id"])})
         await self.ts.executemany(
             "INSERT INTO project_health (time, project_id, owner_id, total) VALUES ($1, $2, $3, $4)", history

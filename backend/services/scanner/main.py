@@ -140,7 +140,8 @@ class Scanner:
             if dir_size_mb(root) > MAX_REPO_MB:
                 raise ScanError(f"repository is larger than {MAX_REPO_MB} MB")
             # the same checks the `bento scan` CLI runs (bento_core.scanning)
-            found = await run_checks(root, list_files(root), self.http, cache=self.r)
+            facts: dict = {}
+            found = await run_checks(root, list_files(root), self.http, cache=self.r, facts=facts)
         except ScanError as exc:
             await self.pg.execute(
                 "UPDATE scans SET status = 'failed', error = $3, finished_at = now() WHERE project_id = $1 AND sha = $2",
@@ -151,24 +152,25 @@ class Scanner:
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
-        new, resolved = await self.save(project["id"], sha, found)
+        new, resolved = await self.save(project["id"], sha, found, facts)
         log.info("done %s@%s: %d findings (%d new, %d resolved)", name, sha[:7], len(found), new, resolved)
         await self.note(project, "scan", "Scan finished",
                         f"{sha[:7]}: {len(found)} open finding{'s' if len(found) != 1 else ''}, {new} new, {resolved} resolved")
         await streams.publish(self.r, streams.ADVICE_REQUESTS, {"project_id": str(project["id"])})
 
-    async def save(self, project_id, sha: str, found: list[dict]) -> tuple[int, int]:
+    async def save(self, project_id, sha: str, found: list[dict], facts: dict | None = None) -> tuple[int, int]:
         keys = [f["key"] for f in found]
         async with self.pg.acquire() as conn, conn.transaction():
             before = {r["key"] for r in await conn.fetch(
                 "SELECT key FROM findings WHERE project_id = $1 AND status = 'open'", project_id)}
             for f in found:
                 await conn.execute(
-                    """INSERT INTO findings (project_id, key, severity, title, detail, effort_minutes)
-                       VALUES ($1, $2, $3, $4, $5, $6)
+                    """INSERT INTO findings (project_id, key, severity, title, detail, effort_minutes, meta)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
                        ON CONFLICT (project_id, key) DO UPDATE SET severity = $3, title = $4, detail = $5,
-                         effort_minutes = $6, last_seen = now(), status = 'open', resolved_at = NULL""",
+                         effort_minutes = $6, meta = $7::jsonb, last_seen = now(), status = 'open', resolved_at = NULL""",
                     project_id, f["key"], f["severity"], f["title"], f["detail"], f["effort_minutes"],
+                    f.get("meta"),  # the pool's jsonb codec encodes it
                 )
             await conn.execute(
                 """UPDATE findings SET status = 'resolved', resolved_at = now()
@@ -178,7 +180,9 @@ class Scanner:
             await conn.execute(
                 "UPDATE scans SET status = 'done', finished_at = now() WHERE project_id = $1 AND sha = $2", project_id, sha)
             await conn.execute(
-                "UPDATE projects SET last_scan_at = now(), last_scan_sha = $2, last_scan_error = NULL WHERE id = $1", project_id, sha)
+                """UPDATE projects SET last_scan_at = now(), last_scan_sha = $2, last_scan_error = NULL,
+                          scan_facts = $3::jsonb WHERE id = $1""",
+                project_id, sha, facts or {})
         return len(set(keys) - before), len(before - set(keys))
 
     async def fail(self, project, reason: str) -> None:

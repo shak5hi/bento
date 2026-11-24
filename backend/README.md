@@ -41,9 +41,22 @@ TimescaleDB (`probe_results`, `project_health` hypertables, retention policies) 
 
 ## Engineering Health Score
 
-`Uptime 40 + Latency 20 + Errors 20 + Code 20` over the last 30 minutes of probes. Code starts at 20 and
-loses 8 / 4 / 1.5 / 0.5 points per open critical / high / medium / low finding. A project with no
-endpoints is scored on code alone and marked "code only".
+Four report cards, computed every minute by the analyzer from raw facts (`bento_core/scoring.py`):
+
+| Card | How it's graded | Weight |
+|---|---|---|
+| **Security** | the worst open problem sets it: none 100, low 85, medium 70, high 50, critical 20 (leaked secrets, `.env` files, vulnerable dependencies, secrets in Dockerfiles) | 35 |
+| **Website** | last 7 days: uptime against a 99.5% target (≥99.9% 100 · ≥99.5% 85 · ≥99% 70 · ≥95% 50) × 0.6, plus p95 speed (<0.5 s 100 · <1 s 85 · <2 s 70 · <4 s 50) × 0.4. "Measuring…" until 30 checks | 30 |
+| **Code basics** | checklist: README 20, tests 30, CI 30, lockfile 20; Dockerfile habits −5 each (max −15) | 20 |
+| **Upkeep** | share of npm/PyPI dependencies no more than a major version behind | 15 |
+
+The overall score is the weighted average of the cards that were measured: a card with nothing to measure
+says why (*not monitored*, *measuring*, *not checked*) and is left out instead of counting as perfect.
+**Security F caps the overall at 49, Security D at 69.** Grades: A 90+, B 80+, C 65+, D 50+, F below 50.
+
+Each project also gets the single fix that raises its score most (*Do this next: +12 points*), its change
+over the last week, and a `score_events` history explaining every change (*Fixed: AWS key in config.js*).
+`project_scores.formula` records the version, so thresholds can be retuned and scores recomputed.
 
 ## API (via `/api`)
 
