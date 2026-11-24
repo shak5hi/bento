@@ -67,6 +67,27 @@ async def as_installation(installation_id: int, http: httpx.AsyncClient) -> dict
     return HEADERS | {"Authorization": f"token {await installation_token(installation_id, http)}"}
 
 
+async def create_check_run(repo: str, installation_id: int, head_sha: str, name: str, http: httpx.AsyncClient,
+                           details_url: str | None = None) -> int:
+    """Start an in-progress check run on a commit (needs the app's Checks: write permission)."""
+    body = {"name": name, "head_sha": head_sha, "status": "in_progress"} | ({"details_url": details_url} if details_url else {})
+    res = await http.post(f"{API}/repos/{repo}/check-runs", headers=await as_installation(installation_id, http), json=body)
+    if res.status_code != 201:
+        raise GitHubError(f"GitHub refused to create a check run ({res.status_code}); does the app have Checks: write?")
+    return res.json()["id"]
+
+
+async def complete_check_run(repo: str, installation_id: int, check_id: int, conclusion: str, title: str,
+                             summary: str, http: httpx.AsyncClient) -> None:
+    res = await http.patch(
+        f"{API}/repos/{repo}/check-runs/{check_id}",
+        headers=await as_installation(installation_id, http),
+        json={"status": "completed", "conclusion": conclusion, "output": {"title": title, "summary": summary[:65000]}},
+    )
+    if res.status_code != 200:
+        raise GitHubError(f"GitHub refused to update the check run ({res.status_code})")
+
+
 async def exchange_code(code: str, http: httpx.AsyncClient) -> str:
     res = await http.post(
         "https://github.com/login/oauth/access_token",
