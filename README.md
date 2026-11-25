@@ -113,7 +113,8 @@ cd bento/backend
 docker compose up --build        # app on http://localhost:8080
 ```
 
-Everything has a development default, so no `.env` is needed to try it. To enable **Sign in with GitHub** and
+Everything has a development default, so no `.env` is needed to try it. To put Bento online (one server,
+automatic HTTPS, daily backups), follow [`deploy/README.md`](deploy/README.md). To enable **Sign in with GitHub** and
 private repositories, create a GitHub App: see [Connect GitHub](backend/README.md#connect-github-github-app).
 
 ## Roadmap

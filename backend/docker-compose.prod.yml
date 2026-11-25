@@ -1,0 +1,82 @@
+# Production overrides: run on a server with
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# What changes compared with local development:
+#   * Caddy is the only thing reachable from the internet (ports 80 and 443) and gets HTTPS
+#     certificates for BENTO_DOMAIN automatically. The frontend and API ports are no longer published.
+#   * Real secrets are required: the stack refuses to start with the development placeholders.
+#   * A daily Postgres backup (7 days kept) in the bento_backups volume.
+# See deploy/README.md for the whole walkthrough.
+
+x-required: &required
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in backend/.env (a long random string)}
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: bento-caddy
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      BENTO_DOMAIN: ${BENTO_DOMAIN:?set BENTO_DOMAIN in backend/.env, e.g. bento.yourname.me}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [frontend]
+    networks: [frontend-net]
+
+  frontend:
+    ports: !reset []
+
+  api-gateway:
+    ports: !reset []
+    environment:
+      <<: *required
+      PUBLIC_URL: https://${BENTO_DOMAIN}
+      CORS_ORIGINS: https://${BENTO_DOMAIN}
+
+  notifier:
+    environment:
+      <<: *required
+      PUBLIC_URL: https://${BENTO_DOMAIN}
+
+  scanner: { environment: { PUBLIC_URL: "https://${BENTO_DOMAIN}" } }
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in backend/.env (a long random string)}
+
+  timescaledb:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in backend/.env (a long random string)}
+
+  # one compressed dump of each database per day; the last 7 are kept
+  backup:
+    image: postgres:16-alpine
+    container_name: bento-backup
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in backend/.env}
+      PGUSER: ${POSTGRES_USER:-bento}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          day=$$(date +%F)
+          pg_dump -h postgres -d bento | gzip > /backups/bento-$$day.sql.gz \
+            && pg_dump -h timescaledb -d metrics | gzip > /backups/metrics-$$day.sql.gz \
+            && echo "backup $$day done" || echo "backup $$day FAILED"
+          find /backups -name '*.sql.gz' -mtime +7 -delete
+          sleep 86400
+        done
+    volumes: [bento_backups:/backups]
+    depends_on:
+      postgres: { condition: service_healthy }
+      timescaledb: { condition: service_healthy }
+    networks: [backend-net]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  bento_backups:
