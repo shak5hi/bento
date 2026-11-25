@@ -13,13 +13,14 @@ fi
 
 echo "==> Opening ports 80 and 443"
 # Oracle's Ubuntu images ship iptables rules that block everything but SSH, on top of the cloud
-# security list. Insert ACCEPT rules before the REJECT rule and make them survive reboots.
+# security list. Insert ACCEPT rules at the top (before any REJECT rule; Azure starts with none) and make them
+# survive reboots.
 if command -v iptables >/dev/null; then
   for port in 80 443; do
     sudo iptables -C INPUT -p tcp --dport "$port" -m state --state NEW -j ACCEPT 2>/dev/null \
-      || sudo iptables -I INPUT 5 -p tcp --dport "$port" -m state --state NEW -j ACCEPT
+      || sudo iptables -I INPUT 1 -p tcp --dport "$port" -m state --state NEW -j ACCEPT
   done
-  sudo iptables -C INPUT -p udp --dport 443 -j ACCEPT 2>/dev/null || sudo iptables -I INPUT 5 -p udp --dport 443 -j ACCEPT
+  sudo iptables -C INPUT -p udp --dport 443 -j ACCEPT 2>/dev/null || sudo iptables -I INPUT 1 -p udp --dport 443 -j ACCEPT
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent >/dev/null
   sudo netfilter-persistent save >/dev/null
 fi
