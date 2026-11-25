@@ -35,4 +35,5 @@ export function host(url: string): string {
 }
 
 export const STATUS_LABEL = { healthy: 'Healthy', degraded: 'Needs attention', critical: 'At risk', unknown: 'Waiting for data' } as const;
-export const SEVERITY_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' } as const;
+/** Severity in words a student acts on. */
+export const SEVERITY_LABEL = { critical: 'Fix now', high: 'Fix now', medium: 'This week', low: 'When you have time' } as const;

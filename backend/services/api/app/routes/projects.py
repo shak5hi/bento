@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from bento_core import github, streams
 from bento_core.config import settings
-from bento_core.guides import guide_for
+from bento_core.guides import guide_for, plain
 from bento_core.net import probe_target_error, repo_full_name, repo_url_error
 from bento_core.scoring import status_for
 
@@ -218,8 +218,8 @@ async def get_project(project_id: UUID, user_id: UUID = Depends(current_user_id)
                 "id": str(f["id"]),
                 "key": f["key"],
                 "severity": f["severity"],
-                "title": f["title"],
-                "detail": f["detail"],
+                **dict(zip(("title", "detail"), plain(f["key"], f["title"], f["detail"], f["meta"]))),
+                "technical": {"title": f["title"], "detail": f["detail"]},
                 "effortMinutes": f["effort_minutes"],
                 "firstSeen": f["first_seen"],
                 "fixable": can_fix and github.fixable_finding(f["key"]),

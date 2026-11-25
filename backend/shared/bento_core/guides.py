@@ -195,3 +195,72 @@ def guide_for(key: str) -> dict | None:
 
     return {"what": fill(base["what"]), "why": fill(base["why"]), "steps": [fill(s) for s in base["steps"]],
             "learn": base["learn"]}
+
+
+# ---------- plain words for lists (dashboard tasks, project panel, Pickle, digest) ----------
+# A short title anyone can understand and one line saying where and why. The scanner's original
+# title and detail stay in the database (PR checks and logs use them) and are offered as "technical".
+
+_SECRET_NAMES = {
+    "aws-access-key": "An Amazon (AWS) key", "github-token": "A GitHub access token", "stripe-live-key": "A Stripe payment key",
+    "stripe-test-key": "A Stripe test key", "slack-token": "A Slack access token", "slack-webhook": "A Slack webhook link",
+    "private-key": "A private key", "generic-secret": "A password or API key",
+}
+
+_PLAIN = {
+    "secrets-env-file": ("Your secrets file (.env) is on GitHub", "Anyone who can see the repo can read the passwords in it. Change them and remove the file."),
+    "outdated": ("{count} of your libraries are very out of date", "They're a whole version or more behind, so they've stopped getting fixes. Update them one at a time."),
+    "docker:secret-env": ("A password is baked into your Docker setup", "In {file}. Anyone with the image can read it."),
+    "docker:unpinned-base": ("Your Docker setup can change without warning", "{file} doesn't fix the version it builds on, so a build that worked can break."),
+    "docker:runs-as-root": ("Your app's container has full admin powers", "In {file}. If someone breaks in, they get full control instead of limited access."),
+    "docker:add-instead-of-copy": ("Your Dockerfile uses a riskier command", "{file} uses ADD where the simpler COPY would do."),
+    "docker:no-healthcheck": ("Docker can't tell if your app has frozen", "{file} has no health check, so a stuck app won't be restarted."),
+    "no-tests": ("Your code has no automatic tests", "Tests catch mistakes before your users do. Start with one for the most important feature."),
+    "no-ci": ("Nothing checks your code when you push", "Add an automatic check (CI) so broken builds are caught right away. Bento can set it up for you."),
+    "no-readme": ("Your project has no README", "That's the page that tells people what the project is and how to run it."),
+    "no-lockfile": ("Your library versions aren't locked", "Installs can pull different versions, so it may work for you and break for someone else."),
+}
+
+
+def plain(key: str, title: str, detail: str | None = None, meta: dict | None = None) -> tuple[str, str]:
+    """(plain title, plain one-liner) for a finding, for people who aren't security experts."""
+    parts = key.split(":")
+    if parts[0] == "secret" and len(parts) >= 3:
+        what = _SECRET_NAMES.get(parts[1], "A secret")
+        return f"{what} is visible in your code", f"In {':'.join(parts[2:])}. Anyone who sees the repo can use it, so replace it."
+    if parts[0] == "vuln" and len(parts) >= 3:
+        pkg = ":".join(parts[2:])
+        dev = (meta or {}).get("dev")
+        return (f"A library you use has known security holes: {pkg}",
+                "It's only used while developing, so it's lower risk. Updating it fixes the holes." if dev
+                else "Attackers know about these holes. Updating the library fixes them, usually with one command.")
+    if parts[0] == "outdated":
+        count = (meta or {}).get("behind")
+        if not isinstance(count, int):
+            digits = "".join(ch for ch in title.split(" ")[0] if ch.isdigit())
+            count = int(digits) if digits else None
+        t, d = _PLAIN["outdated"]
+        if count == 1:
+            return "1 of your libraries is very out of date", d.replace("They're", "It's").replace("they've", "it has").replace("Update them one at a time.", "Update it.")
+        return (t.replace("{count}", str(count)) if count else "Some of your libraries are very out of date"), d
+    if parts[0] == "docker" and len(parts) >= 3:
+        found = _PLAIN.get(f"docker:{parts[1]}")
+        if found:
+            file = ":".join(parts[2:])
+            return found[0], found[1].replace("{file}", file)
+    if key in _PLAIN:
+        return _PLAIN[key]
+    return title, detail or ""
+
+
+def plain_incident(kind: str, url: str, peak: float | None, baseline: float | None) -> tuple[str, str]:
+    """(plain title, one-liner) for a live incident."""
+    from urllib.parse import urlsplit
+    host = urlsplit(url).hostname or url
+    if kind == "errors":
+        return "Your site is failing for visitors", f"{host}: {round((peak or 0) * 100)}% of Bento's checks are failing right now."
+
+    def secs(ms: float | None) -> str:
+        ms = ms or 0
+        return f"{ms / 1000:.1f} s" if ms >= 1000 else f"{round(ms)} ms"
+    return "Your site is much slower than usual", f"{host} is taking {secs(peak)} instead of about {secs(baseline)}."

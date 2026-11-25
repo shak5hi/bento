@@ -22,7 +22,7 @@ import writer
 from bento_core import streams
 from bento_core.config import settings
 from bento_core.db import create_pool
-from bento_core.guides import guide_for
+from bento_core.guides import guide_for, plain
 from bento_core.log import setup_logging
 
 log = setup_logging()
@@ -57,7 +57,7 @@ def finding_advice(f: dict) -> dict:
     guide = guide_for(f["key"])
     return {
         "key": f["key"],
-        "title": f["title"],
+        "title": plain(f["key"], f["title"], f.get("detail"), f.get("meta"))[0],
         "why": guide["why"] if guide else (f["detail"] or ""),
         "steps": guide["steps"] if guide else [],
         "guide": guide,
@@ -105,7 +105,7 @@ class Advisor:
             "SELECT total, grade, cards, capped FROM project_scores WHERE project_id = $1", project_id
         )
         findings = [dict(r) for r in await self.pg.fetch(
-            """SELECT key, severity, title, detail, effort_minutes FROM findings
+            """SELECT key, severity, title, detail, effort_minutes, meta FROM findings
                 WHERE project_id = $1 AND status = 'open'""", project_id)]
         incidents = [dict(r) for r in await self.pg.fetch(
             "SELECT url, kind, baseline, peak FROM incidents WHERE project_id = $1 AND status = 'open'", project_id)]
@@ -120,23 +120,26 @@ class Advisor:
             return
 
         brief, recommendations = build_advice(project["name"], score["total"] if score else None, findings, incidents)
+        # The rule-based plan is saved straight away; the model's wording replaces it when it's ready.
+        await self._save(project["id"], digest, brief, recommendations, "rules")
         source = "rules"
         if self.ollama_url and recommendations and self.http is not None:
             facts = writer.facts_for(project["name"], dict(score) if score else None, recommendations, incidents)
             written = await writer.write(self.http, self.ollama_url, self.model, facts, recommendations)
             if written:
-                brief, recommendations = written
                 source = f"ai:{self.model}"
-        for r in recommendations:
-            r.pop("guide", None)  # the API attaches guides to findings itself
+                await self._save(project["id"], digest, *written, source)
+        log.info("advice refreshed for %s (%s)", project["name"], source)
+
+    async def _save(self, project_id, digest: str, brief: str, recommendations: list[dict], source: str) -> None:
+        recs = [{k: v for k, v in r.items() if k != "guide"} for r in recommendations]  # the API attaches guides itself
         await self.pg.execute(
             """INSERT INTO advice (project_id, findings_hash, brief, recommendations, source, generated_at)
                VALUES ($1, $2, $3, $4, $5, now())
                ON CONFLICT (project_id) DO UPDATE SET findings_hash = $2, brief = $3, recommendations = $4,
                  source = $5, generated_at = now()""",
-            project["id"], digest, brief, recommendations, source,
+            project_id, digest, brief, recs, source,
         )
-        log.info("advice refreshed for %s (%s)", project["name"], source)
 
     async def upgrade_loop(self) -> None:
         """Advice written while the model was downloading or down gets rewritten once it's ready."""

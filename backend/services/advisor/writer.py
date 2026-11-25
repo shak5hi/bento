@@ -16,7 +16,7 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "pickle-v1"
+PROMPT_VERSION = "pickle-v2"  # bump to rewrite every saved plan
 TIMEOUT_S = 600  # a small model on a laptop CPU can take minutes; this runs in the background and is cached
 MAX_WHY, MAX_STEP, MAX_BRIEF = 320, 220, 360
 
