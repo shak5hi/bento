@@ -12,6 +12,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from bento_core import github
+from bento_core.guides import plain, plain_incident
 from bento_core.scoring import status_for
 
 from ..security import current_user_id
@@ -66,7 +67,7 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
     )
 
     findings = await state.pg.fetch(
-        """SELECT f.id, f.project_id, p.name AS project_name, f.severity, f.title, f.detail, f.effort_minutes, f.first_seen
+        """SELECT f.id, f.project_id, p.name AS project_name, f.key, f.meta, f.severity, f.title, f.detail, f.effort_minutes, f.first_seen
              FROM findings f JOIN projects p ON p.id = f.project_id
             WHERE p.owner_id = $1 AND f.status = 'open'""",
         user_id,
@@ -91,12 +92,8 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
             "projectId": str(i["project_id"]),
             "projectName": i["project_name"],
             "severity": "critical" if i["kind"] == "errors" else "high",
-            "title": "Errors spiking" if i["kind"] == "errors" else "Latency well above baseline",
-            "detail": (
-                f"{i['url']} — peak {round(i['peak'] or 0)} ms vs {round(i['baseline'] or 0)} ms normal."
-                if i["kind"] == "latency"
-                else f"{i['url']} is failing ({round((i['peak'] or 0) * 100)}% of recent probes)."
-            ),
+            # plain words a student understands (bento_core.guides)
+            **dict(zip(("title", "detail"), plain_incident(i["kind"], i["url"], i["peak"], i["baseline"]))),
             "effortMinutes": None,
             "since": i["opened_at"],
         }
@@ -108,8 +105,8 @@ async def dashboard(user_id: UUID = Depends(current_user_id)):
             "projectId": str(f["project_id"]),
             "projectName": f["project_name"],
             "severity": f["severity"],
-            "title": f["title"],
-            "detail": f["detail"],
+            **dict(zip(("title", "detail"), plain(f["key"], f["title"], f["detail"], f["meta"]))),
+            "technical": {"title": f["title"], "detail": f["detail"]},
             "effortMinutes": f["effort_minutes"],
             "since": f["first_seen"],
         }

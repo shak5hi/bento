@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, api, auth, type Dashboard as DashboardData, type ProjectSummary, type SystemHealth, type Task } from '../lib/api';
-import { STATUS_LABEL, effort, firstName, greeting, timeAgo } from '../lib/format';
+import { SEVERITY_LABEL, STATUS_LABEL, effort, firstName, greeting, timeAgo } from '../lib/format';
 import { LineChart } from '../components/LineChart';
 import { RiceBall } from '../components/RiceBall';
 import { ProjectDrawer } from './dashboard/ProjectDrawer';
@@ -218,7 +218,7 @@ function Hero({ data }: { data: DashboardData }) {
         <dl className="health-stats">
           <div><dt>Projects</dt><dd>{portfolio.projects}</dd></div>
           <div><dt>Need attention</dt><dd>{portfolio.needsAttention}</dd></div>
-          <div><dt>Live incidents</dt><dd className={portfolio.openIncidents ? 'is-crit' : ''}>{portfolio.openIncidents}</dd></div>
+          <div><dt>Sites down or slow</dt><dd className={portfolio.openIncidents ? 'is-crit' : ''}>{portfolio.openIncidents}</dd></div>
         </dl>
       </div>
     </section>
@@ -243,7 +243,7 @@ function Today({ tasks, total, onOpen }: { tasks: Task[]; total: number; onOpen:
       {tasks.length === 0 ? (
         <div className="calm">
           <p className="calm-title">Nothing needs you right now.</p>
-          <p>Every monitored endpoint is within its normal range and the latest scans came back clean.</p>
+          <p>Every website Bento watches is working normally, and the latest code checks found nothing urgent.</p>
         </div>
       ) : (
         <ol className="tasks">
@@ -257,7 +257,7 @@ function Today({ tasks, total, onOpen }: { tasks: Task[]; total: number; onOpen:
                   {t.detail && <span className="task-detail">{t.detail}</span>}
                   <span className="task-meta">
                     <span>{t.projectName}</span>
-                    <span className={`sev sev-${t.severity}`}>{t.kind === 'incident' ? 'Live incident' : t.severity}</span>
+                    <span className={`sev sev-${t.severity}`}>{t.kind === 'incident' ? 'Happening now' : SEVERITY_LABEL[t.severity]}</span>
                     {effort(t.effortMinutes) && <span>{effort(t.effortMinutes)}</span>}
                   </span>
                 </span>
@@ -287,7 +287,7 @@ function Projects({ projects, onOpen }: { projects: ProjectSummary[]; onOpen: (i
               <span className="project-name">
                 {p.name}
                 <span className="project-sub">
-                  {p.endpoints} endpoint{p.endpoints === 1 ? '' : 's'}
+                  {p.endpoints ? `${p.endpoints} site${p.endpoints === 1 ? '' : 's'} watched` : 'no website added'}
                   {p.repoUrl ? ` · scanned ${timeAgo(p.lastScanAt)}` : ' · no repository'}
                 </span>
               </span>
@@ -297,11 +297,11 @@ function Projects({ projects, onOpen }: { projects: ProjectSummary[]; onOpen: (i
               </span>
               <span className={`status-text s-${p.status}`}>
                 {STATUS_LABEL[p.status]}
-                {p.basis === 'code' && p.health !== null && <em> · code only</em>}
+                {p.basis === 'code' && p.health !== null && <em> · from code checks only</em>}
               </span>
               <span className="project-counts">
-                {p.openIncidents > 0 && <span className="sev sev-critical">{p.openIncidents} incident{p.openIncidents > 1 ? 's' : ''}</span>}
-                {p.openFindings > 0 && <span>{p.openFindings} finding{p.openFindings > 1 ? 's' : ''}</span>}
+                {p.openIncidents > 0 && <span className="sev sev-critical">site {p.openIncidents > 1 ? 'problems' : 'problem'} now</span>}
+                {p.openFindings > 0 && <span>{p.openFindings} problem{p.openFindings > 1 ? 's' : ''}</span>}
                 {p.openIncidents === 0 && p.openFindings === 0 && <span className="muted">Clear</span>}
               </span>
             </button>
@@ -321,7 +321,7 @@ function Activity({ items }: { items: DashboardData['activity'] }) {
         <h2>Recent activity</h2>
       </div>
       {items.length === 0 ? (
-        <p className="muted small">Scans, incidents and recoveries will show up here.</p>
+        <p className="muted small">Code checks, site problems and recoveries will show up here.</p>
       ) : (
         <ul className="activity">
           {items.map((a, i) => (
@@ -383,7 +383,7 @@ function EmptyState({ name, onNew }: { name: string; onNew: () => void }) {
         Every project deserves <b>a place at the table.</b>
       </h1>
       <p className="empty-lede">
-        Add a project and Bento starts watching it straight away: uptime and latency from the endpoints you list, code health from
+        Add a project and Bento starts watching it straight away: whether your website is up and fast, and how healthy the code is, from
         its repository. Pickle turns all of it into a short list of what to do next.
       </p>
       <ol className="steps">

@@ -226,17 +226,17 @@ def test_fix_requests(client, user, db):
         )
 
     db(seed, None)
-    findings = {f["title"]: f for f in client.get(f"/api/projects/{p['id']}", headers=headers).json()["findings"]}
+    findings = {f["technical"]["title"]: f for f in client.get(f"/api/projects/{p['id']}", headers=headers).json()["findings"]}
     assert findings["No CI"]["fixable"] is False  # not imported through the app
     assert client.post(f"/api/projects/{p['id']}/findings/{findings['No CI']['id']}/fix", headers=headers).status_code == 422
 
     db(seed, 99)
-    findings = {f["title"]: f for f in client.get(f"/api/projects/{p['id']}", headers=headers).json()["findings"]}
+    findings = {f["technical"]["title"]: f for f in client.get(f"/api/projects/{p['id']}", headers=headers).json()["findings"]}
     assert findings["No CI"]["fixable"] is True and findings["No tests"]["fixable"] is False
     url = f"/api/projects/{p['id']}/findings/{findings['No CI']['id']}/fix"
     assert client.post(url, headers=headers).status_code == 202
     assert client.post(url, headers=headers).status_code == 409  # one PR per finding
-    after = {f["title"]: f for f in client.get(f"/api/projects/{p['id']}", headers=headers).json()["findings"]}
+    after = {f["technical"]["title"]: f for f in client.get(f"/api/projects/{p['id']}", headers=headers).json()["findings"]}
     assert after["No CI"]["fix"]["status"] == "queued"
     assert client.post(f"/api/projects/{p['id']}/findings/{findings['No tests']['id']}/fix", headers=headers).status_code == 422
 

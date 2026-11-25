@@ -12,7 +12,7 @@ interface Props {
 
 const CARD_ORDER = ['security', 'website', 'basics', 'upkeep'] as const;
 
-const EP_STATE = { normal: 'Normal', failing: 'Failing', incident: 'Incident', pending: 'First probe soon' } as const;
+const EP_STATE = { normal: 'Normal', failing: 'Failing', incident: 'Incident', pending: 'First check soon' } as const;
 
 type Finding = ProjectDetail['findings'][number];
 
@@ -98,11 +98,11 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
     run('add', async () => {
       await api(`/projects/${projectId}/endpoints`, { method: 'POST', body: { url: newUrl.trim() } });
       setNewUrl('');
-    }, 'Endpoint added — first probe within a minute.');
+    }, 'Website added. The first check runs within a minute.');
   };
 
   const remove = async () => {
-    if (!data || !window.confirm(`Delete ${data.project.name}? Its history, findings and incidents go with it.`)) return;
+    if (!data || !window.confirm(`Delete ${data.project.name}? Its history and problems go with it.`)) return;
     setBusy('delete');
     try {
       await api(`/projects/${projectId}`, { method: 'DELETE' });
@@ -236,16 +236,16 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
 
             {openIncidents.length > 0 && (
               <section className="d-section">
-                <h3>Live incidents</h3>
+                <h3>Happening now</h3>
                 <ul className="rows">
                   {openIncidents.map((i) => (
                     <li key={i.id} className="row">
-                      <span className="sev sev-critical">{i.kind === 'latency' ? 'Slow' : 'Errors'}</span>
+                      <span className="sev sev-critical">{i.kind === 'latency' ? 'Slow' : 'Failing'}</span>
                       <span className="row-main">{host(i.url)}</span>
                       <span className="muted">
                         {i.kind === 'latency'
-                          ? `${Math.round(i.peak ?? 0)} ms vs ${Math.round(i.baseline ?? 0)} ms`
-                          : `${Math.round((i.peak ?? 0) * 100)}% failing`}{' '}
+                          ? `${Math.round(i.peak ?? 0)} ms instead of about ${Math.round(i.baseline ?? 0)} ms`
+                          : `${Math.round((i.peak ?? 0) * 100)}% of checks failing`}{' '}
                         · since {timeAgo(i.openedAt)}
                       </span>
                     </li>
@@ -256,15 +256,15 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
 
             <section className="d-section">
               <div className="d-head">
-                <h3>Endpoints</h3>
-                <span className="muted small">p95 latency, last hour</span>
+                <h3>Websites</h3>
+                <span className="muted small">How fast it answers, last hour</span>
               </div>
               <LineChart
                 points={latency.map((pt) => ({ t: pt.t, v: pt.p95 }))}
                 height={96}
-                format={(v) => `${Math.round(v)} ms p95`}
+                format={(v) => `${Math.round(v)} ms`}
                 formatTime={(t) => new Date(t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                label="p95 latency over the last hour"
+                label="How fast the website answered over the last hour"
               />
               <ul className="rows">
                 {data.endpoints.map((e) => (
@@ -279,7 +279,7 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
                       className="row-x"
                       aria-label={`Stop monitoring ${e.url}`}
                       disabled={busy === e.id}
-                      onClick={() => run(e.id, () => api(`/endpoints/${e.id}`, { method: 'DELETE' }), 'Endpoint removed.')}
+                      onClick={() => run(e.id, () => api(`/endpoints/${e.id}`, { method: 'DELETE' }), 'Website removed.')}
                     >
                       ✕
                     </button>
@@ -294,7 +294,7 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
 
             <section className="d-section">
               <div className="d-head">
-                <h3>Code findings</h3>
+                <h3>Problems in the code</h3>
                 <span className="muted small">
                   {p.repoUrl ? `Last scan ${timeAgo(p.lastScanAt)}${p.lastScanSha ? ` · ${p.lastScanSha.slice(0, 7)}` : ''}` : 'No repository connected'}
                 </span>
@@ -335,11 +335,11 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
 
             {pastIncidents.length > 0 && (
               <section className="d-section">
-                <h3>Resolved incidents</h3>
+                <h3>Fixed site problems</h3>
                 <ul className="rows">
                   {pastIncidents.map((i) => (
                     <li key={i.id} className="row">
-                      <span className="sev sev-low">{i.kind}</span>
+                      <span className="sev sev-low">{i.kind === 'latency' ? 'Was slow' : 'Was failing'}</span>
                       <span className="row-main">{host(i.url)}</span>
                       <span className="muted">{timeAgo(i.closedAt)}</span>
                     </li>
@@ -371,8 +371,8 @@ export function ProjectDrawer({ projectId, onClose, onChanged }: Props) {
               </div>
               <p className="muted small public-note">
                 {p.isPublic
-                  ? 'Anyone with the link sees the health score, uptime, latency and incidents. Code findings always stay private.'
-                  : 'Off. Turn it on to share uptime, latency and incidents, and to get a README badge. Code findings are never shown.'}
+                  ? 'Anyone with the link sees the health score and whether the website is up and fast. Problems in your code always stay private.'
+                  : 'Off. Turn it on to share whether your website is up and fast, and to get a README badge. Problems in your code are never shown.'}
               </p>
               {publicUrl && badgeUrl && (
                 <div className="public-share">

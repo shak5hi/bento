@@ -393,7 +393,7 @@ def test_pickle_uses_the_model_and_falls_back_to_rules(client, user, db):
     pickle = client.get(f"/api/projects/{p['id']}", headers=headers).json()["advice"]
     assert pickle["source"] == "rules"
     first = pickle["recommendations"][0]
-    assert first["title"] == "AWS access key ID committed in cfg.py" and first["steps"]  # guide steps, even without the model
+    assert first["title"] == "An Amazon (AWS) key is visible in your code" and first["steps"]  # plain words + guide steps, no model needed
     assert "guide" not in first
 
     reply = {"brief": "Shop has a leaked AWS key. Replace it first, then add CI.",
@@ -402,9 +402,12 @@ def test_pickle_uses_the_model_and_falls_back_to_rules(client, user, db):
     db(advise, model(reply), True)
     pickle = client.get(f"/api/projects/{p['id']}", headers=headers).json()["advice"]
     assert pickle["source"] == "ai:qwen2.5:1.5b" and pickle["brief"].startswith("Shop has a leaked AWS key")
-    assert [r["title"] for r in pickle["recommendations"]] == ["AWS access key ID committed in cfg.py", "No CI pipeline"]
+    assert [r["title"] for r in pickle["recommendations"]] == ["An Amazon (AWS) key is visible in your code", "Nothing checks your code when you push"]
     assert pickle["recommendations"][0]["steps"] == ["Deactivate the key in AWS.", "Use an environment variable."]
 
     detail = client.get(f"/api/projects/{p['id']}", headers=headers).json()
-    guide = next(f for f in detail["findings"] if f["title"].startswith("AWS"))["guide"]
+    aws = next(f for f in detail["findings"] if f["key"].startswith("secret:aws"))
+    assert aws["title"] == "An Amazon (AWS) key is visible in your code" and "cfg.py" in aws["detail"]
+    assert aws["technical"]["title"] == "AWS access key ID committed in cfg.py"  # the scanner's words are kept
+    guide = aws["guide"]
     assert "cfg.py" in guide["what"] and guide["steps"]

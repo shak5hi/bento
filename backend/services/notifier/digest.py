@@ -3,6 +3,8 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from bento_core.guides import plain
+
 SEVERITY_ORDER = ("critical", "high", "medium", "low")
 
 
@@ -47,12 +49,12 @@ async def build(pg, ts, user_id) -> dict | None:
     change = (health - round(sum(then) / len(then))) if health is not None and then else None
 
     new = await pg.fetch(
-        """SELECT f.title, f.severity, p.name FROM findings f JOIN projects p ON p.id = f.project_id
+        """SELECT f.key, f.meta, f.title, f.severity, p.name FROM findings f JOIN projects p ON p.id = f.project_id
             WHERE p.owner_id = $1 AND f.status = 'open' AND f.first_seen > now() - interval '7 days'""",
         user_id,
     )
     resolved = await pg.fetch(
-        """SELECT f.title, f.severity, p.name FROM findings f JOIN projects p ON p.id = f.project_id
+        """SELECT f.key, f.meta, f.title, f.severity, p.name FROM findings f JOIN projects p ON p.id = f.project_id
             WHERE p.owner_id = $1 AND f.status = 'resolved' AND f.resolved_at > now() - interval '7 days'""",
         user_id,
     )
@@ -69,7 +71,8 @@ async def build(pg, ts, user_id) -> dict | None:
     recs.sort(key=rank)
 
     def listed(found):
-        return sorted(({"title": f["title"], "project": f["name"], "severity": f["severity"]} for f in found), key=rank)
+        return sorted(({"title": plain(f["key"], f["title"], None, f["meta"])[0], "project": f["name"], "severity": f["severity"]}
+                       for f in found), key=rank)
 
     return {"health": health, "change": change, "projects": rows, "new": listed(new), "resolved": listed(resolved),
             "top": recs[:3]}
