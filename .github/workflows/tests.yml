@@ -90,3 +90,7 @@ jobs:
       - name: Build every service
         working-directory: backend
         run: docker compose build
+      - name: Check the production setup
+        working-directory: backend
+        # placeholders only: this checks the files, nothing is started
+        run: BENTO_DOMAIN=bento.example.test JWT_SECRET=placeholder POSTGRES_PASSWORD=placeholder docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
