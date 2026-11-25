@@ -60,6 +60,7 @@ nano ~/bento/backend/.env
 - `POSTGRES_PASSWORD`, `JWT_SECRET`: run `openssl rand -hex 32` once for each and paste the output
 - `GITHUB_*`: the same values as on your laptop (copy them over yourself)
 - `RESEND_API_KEY`, `EMAIL_FROM`: see step 8
+- `PICKLE_MODEL=qwen2.5:3b`: the server can run a stronger model than a laptop
 
 ## 6. Start Bento
 
@@ -107,5 +108,5 @@ the last 7 are kept. To copy them off the server:
 `docker run --rm -v bento_bento_backups:/b -v "$PWD":/out alpine cp -r /b /out/backups`.
 To restore one: `gunzip -c bento-YYYY-MM-DD.sql.gz | docker exec -i bento-postgres psql -U bento -d bento`.
 
-**Pickle's model:** the template uses `qwen2.5:3b`, which the 24 GB server runs comfortably. Set
-`PICKLE_MODEL` to any Ollama model, or `OLLAMA_URL=` (empty) to use rule-based text only.
+**Pickle's model:** set `PICKLE_MODEL=qwen2.5:3b` in `.env`: the 24 GB server runs it comfortably and it
+writes better than the laptop default. Any Ollama model works, or `OLLAMA_URL=` (empty) for rule-based text only.
