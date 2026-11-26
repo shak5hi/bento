@@ -1,14 +1,21 @@
-"""Email through Resend: incident alerts and the weekly digest, each with a one-click unsubscribe.
+"""Email: incident alerts, the welcome report and the weekly digest, each with a one-click unsubscribe.
 
-Without RESEND_API_KEY every send is skipped with a log line and returns False; nothing else changes.
+Sent through an SMTP mailbox when SMTP_USER/SMTP_PASSWORD are set (e.g. a free Gmail account with an
+app password), otherwise through Resend when RESEND_API_KEY is set. With neither, every send is skipped
+with a log line and returns False; nothing else changes.
 Unsubscribe links carry a signed token (same signing key as logins, but typ=unsubscribe, so neither can
 be used as the other). They never expire: an unsubscribe link must keep working.
 """
 
 from __future__ import annotations
 
+import asyncio
 import html
 import logging
+import smtplib
+import ssl
+from email.message import EmailMessage
+from email.utils import formataddr, make_msgid
 from uuid import UUID
 
 import httpx
@@ -24,8 +31,12 @@ TOKEN_TYPE = "unsubscribe"
 UNDELIVERABLE = ("@users.noreply.github.com",)  # GitHub accounts without a public email
 
 
+def smtp_configured() -> bool:
+    return bool(settings.smtp_user and settings.smtp_password)
+
+
 def configured() -> bool:
-    return bool(settings.resend_api_key)
+    return smtp_configured() or bool(settings.resend_api_key)
 
 
 def deliverable(address: str | None) -> bool:
@@ -59,11 +70,18 @@ def unsubscribe_url(user_id: UUID | str, kind: str) -> str:
 async def send(http: httpx.AsyncClient, to: str, subject: str, html_body: str, text: str, unsubscribe: str) -> bool:
     """Send one email. Returns False (and logs why) when it wasn't sent; never raises for delivery problems."""
     if not configured():
-        log.info("email skipped (RESEND_API_KEY not set): %s", subject)
+        log.info("email skipped (neither SMTP_USER/SMTP_PASSWORD nor RESEND_API_KEY set): %s", subject)
         return False
     if not deliverable(to):
         log.info("email skipped (no deliverable address): %s", subject)
         return False
+    if smtp_configured():
+        try:
+            await asyncio.to_thread(_smtp_send, to, subject, html_body, text, unsubscribe)
+        except (smtplib.SMTPException, OSError) as exc:
+            log.warning("email not sent (SMTP %s): %s", type(exc).__name__, subject)
+            return False
+        return True
     try:
         res = await http.post(
             RESEND_URL,
@@ -86,6 +104,23 @@ async def send(http: httpx.AsyncClient, to: str, subject: str, html_body: str, t
         log.warning("email not sent (Resend %s): %s", res.status_code, subject)
         return False
     return True
+
+
+def _smtp_send(to: str, subject: str, html_body: str, text: str, unsubscribe: str) -> None:
+    msg = EmailMessage()
+    # Gmail only sends as the signed-in mailbox, so the sender address is always SMTP_USER.
+    msg["From"] = formataddr(("Bento", settings.smtp_user))
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg["Message-ID"] = make_msgid(domain=settings.smtp_user.rsplit("@", 1)[-1])
+    msg["List-Unsubscribe"] = f"<{unsubscribe}>"
+    msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    msg.set_content(text)
+    msg.add_alternative(html_body, subtype="html")
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
+        smtp.starttls(context=ssl.create_default_context())
+        smtp.login(settings.smtp_user, settings.smtp_password)
+        smtp.send_message(msg)
 
 
 # ---------- templates (simple HTML, inline styles: email clients ignore stylesheets) ----------

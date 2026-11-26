@@ -37,6 +37,12 @@ class Settings:
     pickle_model = _env("PICKLE_MODEL", "qwen2.5:1.5b")
     # Email (Resend). Without RESEND_API_KEY emails are skipped with a log line; everything else works.
     resend_api_key = _env("RESEND_API_KEY")
+    # Or any SMTP mailbox, e.g. a Gmail account with an app password (free, ~500 emails a day).
+    # Used instead of Resend when SMTP_USER and SMTP_PASSWORD are set.
+    smtp_host = _env("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(_env("SMTP_PORT", "587"))
+    smtp_user = _env("SMTP_USER")
+    smtp_password = _env("SMTP_PASSWORD")
     email_from = _env("EMAIL_FROM", "Bento <onboarding@resend.dev>")
     digest_timezone = _env("DIGEST_TIMEZONE", "UTC")
     digest_hour = int(_env("DIGEST_HOUR", "8"))  # Monday at this local hour

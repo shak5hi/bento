@@ -88,7 +88,19 @@ tunnel address) with `https://bento.yourname.me` in:
 
 No more cloudflared tunnel: the webhook address never changes now.
 
-## 8. Email to anyone (Resend)
+## 8. Email to anyone
+
+**Free, no domain needed: Gmail.** Use a Gmail account for Bento (a new one is tidiest):
+
+1. Turn on **2-Step Verification** for that account (https://myaccount.google.com/security).
+2. Open **https://myaccount.google.com/apppasswords**, create an app password called `Bento`, and copy the
+   16 letters.
+3. In `backend/.env` set `SMTP_USER=` the Gmail address and `SMTP_PASSWORD=` the 16 letters (no spaces).
+4. Restart: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+
+Gmail sends up to about 500 emails a day, and emails come from that Gmail address.
+
+**Or Resend, with your own domain:**
 
 1. In **https://resend.com/domains**, add your domain and add the DNS records it shows (SPF and DKIM) at
    your domain's DNS settings. Wait for *Verified*.

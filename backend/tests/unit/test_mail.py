@@ -53,7 +53,38 @@ async def test_without_an_api_key_emails_are_skipped(monkeypatch, caplog):
     async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: pytest.fail("must not call Resend"))) as http:
         with caplog.at_level("INFO"):
             assert await mail.send(http, "a@example.com", "Hi", "<p>hi</p>", "hi", "https://x/unsub") is False
-    assert "RESEND_API_KEY not set" in caplog.text
+    assert "RESEND_API_KEY set" in caplog.text
+
+
+async def test_send_through_gmail_smtp_when_configured(monkeypatch):
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout):
+            sent.append(("connect", host, port))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def starttls(self, context):
+            sent.append(("tls",))
+
+        def login(self, user, password):
+            sent.append(("login", user))
+
+        def send_message(self, msg):
+            sent.append(("send", msg["From"], msg["To"], msg["Subject"], msg["List-Unsubscribe"]))
+
+    monkeypatch.setattr(settings, "smtp_user", "bento.alerts@gmail.com")
+    monkeypatch.setattr(settings, "smtp_password", "app-password-for-tests")
+    monkeypatch.setattr(mail.smtplib, "SMTP", FakeSMTP)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: pytest.fail("must not call Resend"))) as http:
+        assert await mail.send(http, "friend@example.com", "Hi", "<p>hi</p>", "hi", "https://x/unsub") is True
+    assert sent[0] == ("connect", "smtp.gmail.com", 587) and ("tls",) in sent
+    assert sent[-1] == ("send", "Bento <bento.alerts@gmail.com>", "friend@example.com", "Hi", "<https://x/unsub>")
 
 
 async def test_send_through_resend_with_one_click_unsubscribe(resend):

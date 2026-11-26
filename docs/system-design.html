@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bento: how it works (animated system design)</title>
+<style>
+  :root {
+    --paper: #fbfaf8; --surface: #ffffff; --ink: #17130f; --ink-2: #4a443d; --muted: #8a8680;
+    --line: #e4dfd6; --brand: #f15a24; --brand-soft: #fde6dc;
+    --people: #2f6f8f; --door: #6b4fa0; --api: #17130f; --rail: #b8422f; --worker: #a8701c; --store: #4a7a5c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 Inter, -apple-system, "Segoe UI", Arial, sans-serif; }
+  header { max-width: 1240px; margin: 0 auto; padding: 40px 24px 8px; }
+  h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.1; }
+  h1 b { font-weight: 650; }
+  header p { margin: 12px 0 0; max-width: 62ch; color: var(--ink-2); }
+  main { max-width: 1240px; margin: 0 auto; padding: 16px 24px 48px; }
+
+  .stories { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 16px; }
+  .stories button {
+    font: inherit; font-size: 15px; padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    transition: background .2s, border-color .2s, color .2s;
+  }
+  .stories button:hover { border-color: var(--ink); }
+  .stories button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+  .stage { display: flex; flex-direction: column; gap: 14px; }
+  .board { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px; }
+  svg { display: block; width: 100%; height: auto; }
+
+  .node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; transition: stroke .25s, fill .25s; }
+  .node .title { font-size: 17px; font-weight: 600; fill: var(--ink); }
+  .node .sub { font-size: 13px; fill: var(--muted); }
+  .node .dot { transition: r .25s; }
+  .node.on > rect:first-child { stroke: var(--brand); stroke-width: 2.5; fill: #fff8f4; }
+  .node.dim { opacity: .38; transition: opacity .3s; }
+  .node { transition: opacity .3s; }
+  .lane-label { font-size: 13px; fill: #fff; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .group-label { font-size: 12px; font-weight: 600; letter-spacing: .14em; fill: var(--muted); text-transform: uppercase; }
+  .wire { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  .wire.on { stroke: var(--brand); stroke-width: 2.5; stroke-dasharray: 6 6; animation: flow .6s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset: -12; } }
+  .packet { fill: var(--brand); filter: drop-shadow(0 0 6px rgba(241, 90, 36, .6)); }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px;
+           display: grid; grid-template-columns: 220px minmax(0, 1fr) auto; gap: 8px 28px; align-items: center; }
+  .panel h2 { margin: 0 0 4px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .panel .count { font-size: 13px; color: var(--muted); }
+  .caption { margin: 0; min-height: 3em; font-size: 18px; line-height: 1.5; }
+  .caption b { color: var(--brand); font-weight: 600; }
+  .controls { display: flex; gap: 8px; }
+  .controls button { font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); cursor: pointer; }
+  .controls button:hover { border-color: var(--ink); }
+  .controls .play { background: var(--ink); color: var(--paper); border-color: var(--ink); min-width: 90px; }
+  ol.steps { margin: 0; padding: 16px 22px 16px 44px; font-size: 14px; color: var(--muted); columns: 2 320px; column-gap: 40px;
+            background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+  ol.steps li { break-inside: avoid; }
+  ol.steps li { margin: 4px 0; cursor: pointer; }
+  ol.steps li.done { color: var(--ink-2); }
+  ol.steps li.now { color: var(--ink); font-weight: 600; }
+
+  .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 28px; }
+  .legend div { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; color: var(--ink-2); }
+  .legend strong { display: block; color: var(--ink); font-size: 15px; margin-bottom: 2px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+  footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; font-size: 13px; color: var(--muted); }
+  footer a { color: var(--ink-2); }
+
+  @media (max-width: 860px) { .panel { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .wire.on { animation: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>How <b>Bento</b> works</h1>
+  <p>Bento is a team of small programs, like a restaurant kitchen where each cook has one job and they pass
+     order slips along a rail. Pick a story below and watch a request travel through the system, one step
+     at a time, explained in plain words.</p>
+</header>
+
+<main>
+  <div class="stories" role="group" aria-label="Pick a story"></div>
+
+  <div class="stage">
+    <aside class="panel" aria-live="polite">
+      <div><h2 id="story-title"></h2><div class="count" id="count"></div></div>
+      <p class="caption" id="caption"></p>
+      <div class="controls">
+        <button id="prev" aria-label="Previous step">◀</button>
+        <button id="play" class="play">Pause</button>
+        <button id="next" aria-label="Next step">▶</button>
+      </div>
+    </aside>
+    <div class="board">
+      <svg id="map" viewBox="0 0 1200 700" role="img" aria-label="Bento system diagram">
+        <g id="wires"></g>
+        <g id="nodes"></g>
+        <circle id="packet" class="packet" r="8" cx="-20" cy="-20"></circle>
+      </svg>
+    </div>
+
+    <ol class="steps" id="steps"></ol>
+  </div>
+
+  <section class="legend">
+    <div><strong><i style="background:var(--people)"></i>People and outside services</strong>You, GitHub (where code lives), your live website and Gmail (sends the emails).</div>
+    <div><strong><i style="background:var(--door)"></i>The front door</strong>Caddy is the only part open to the internet. It makes the connection secure (the 🔒) and sends people inside.</div>
+    <div><strong><i style="background:var(--api)"></i>The head waiter</strong>The API gateway takes every request, checks who you are and hands jobs to the kitchen.</div>
+    <div><strong><i style="background:var(--rail)"></i>The order rail</strong>Redis Streams: job slips wait here in line. If a cook crashes, another picks up the slip 30 seconds later, so nothing is lost.</div>
+    <div><strong><i style="background:var(--worker)"></i>The cooks</strong>Seven workers, each with one job: scheduling, visiting sites, spotting problems, reading code, advising, fixing and messaging.</div>
+    <div><strong><i style="background:var(--store)"></i>The filing cabinets</strong>Postgres keeps the records, TimescaleDB keeps every site visit over time, and Ollama is the small AI model that runs on Bento's own server.</div>
+  </section>
+</main>
+
+<footer>
+  Bento runs as 14 containers on one server, started together with Docker Compose. Live at
+  <a href="https://bento.104-43-56-1.sslip.io">bento.104-43-56-1.sslip.io</a>. The plain-language guide is
+  in <a href="how-bento-works.md">how-bento-works.md</a>.
+</footer>
+
+<script>
+// ---------- the map ----------
+const W = 172, H = 62;
+const NODES = {
+  you:       { x: 30,   y: 150, t: 'You',            s: 'your web browser',        c: 'people' },
+  github:    { x: 30,   y: 470, t: 'GitHub',         s: 'where your code lives',   c: 'people' },
+  caddy:     { x: 232,  y: 150, t: 'Caddy',          s: 'front door + 🔒 HTTPS',    c: 'door' },
+  frontend:  { x: 420,  y: 70,  t: 'Frontend',       s: 'the pages you see',       c: 'api' },
+  api:       { x: 420,  y: 300, t: 'API gateway',    s: 'checks who you are',      c: 'api' },
+  scheduler: { x: 800,  y: 20,  t: 'Scheduler',      s: 'decides when to visit',   c: 'worker' },
+  probers:   { x: 800,  y: 112, t: 'Probers',        s: 'visit your site',         c: 'worker' },
+  analyzer:  { x: 800,  y: 204, t: 'Analyzer',       s: "spots what's not normal", c: 'worker' },
+  scanner:   { x: 800,  y: 296, t: 'Scanner',        s: 'reads your code',         c: 'worker' },
+  advisor:   { x: 800,  y: 388, t: 'Pickle',         s: 'picks your top 3',        c: 'worker' },
+  fixer:     { x: 800,  y: 480, t: 'Fixer',          s: 'opens fix pull requests', c: 'worker' },
+  notifier:  { x: 800,  y: 572, t: 'Notifier',       s: 'sends alerts + emails',   c: 'worker' },
+  postgres:  { x: 1010, y: 70,  t: 'Postgres',       s: 'records: users, scores',  c: 'store' },
+  timescale: { x: 1010, y: 190, t: 'TimescaleDB',    s: 'every site visit',        c: 'store' },
+  ollama:    { x: 1010, y: 310, t: 'Ollama',         s: 'local AI model',          c: 'store' },
+  sites:     { x: 1010, y: 430, t: 'Your website',   s: 'on the internet',         c: 'people' },
+  gmail:     { x: 1010, y: 572, t: 'Gmail',          s: 'delivers the emails',     c: 'people' },
+};
+const RAIL = { x: 622, y: 20, w: 144, h: 610 };
+const LANES = ['scan.jobs', 'advice.requests', 'fix.jobs', 'probe.jobs', 'probe.results', 'alerts'];
+NODES.redis = { x: RAIL.x, y: RAIL.y, w: RAIL.w, h: RAIL.h, t: 'Redis', s: 'the order rail', c: 'rail', rail: true };
+
+const COLOURS = { people: '--people', door: '--door', api: '--api', rail: '--rail', worker: '--worker', store: '--store' };
+const NS = 'http://www.w3.org/2000/svg';
+const el = (name, attrs = {}, parent) => {
+  const n = document.createElementNS(NS, name);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (parent) parent.appendChild(n);
+  return n;
+};
+const box = (id) => { const n = NODES[id]; return { x: n.x, y: n.y, w: n.w || W, h: n.h || H }; };
+
+const nodesG = document.getElementById('nodes');
+const nodeEls = {};
+for (const [id, n] of Object.entries(NODES)) {
+  const b = box(id);
+  const g = el('g', { class: 'node', 'data-id': id }, nodesG);
+  el('rect', { x: b.x, y: b.y, width: b.w, height: b.h, rx: 10 }, g);
+  const colour = getComputedStyle(document.documentElement).getPropertyValue(COLOURS[n.c]).trim();
+  if (n.rail) {
+    el('text', { x: b.x + b.w / 2, y: b.y + 26, class: 'title', 'text-anchor': 'middle' }, g).textContent = 'Redis';
+    el('text', { x: b.x + b.w / 2, y: b.y + 44, class: 'sub', 'text-anchor': 'middle' }, g).textContent = 'the order rail';
+    LANES.forEach((lane, i) => {
+      const ly = b.y + 80 + i * 88;
+      el('rect', { x: b.x + 10, y: ly, width: b.w - 20, height: 28, rx: 6, style: `fill:${colour};stroke:none` }, g);
+      el('text', { x: b.x + b.w / 2, y: ly + 19, class: 'lane-label', 'text-anchor': 'middle' }, g).textContent = lane;
+    });
+  } else {
+    el('circle', { cx: b.x + 16, cy: b.y + 22, r: 5, fill: colour, class: 'dot' }, g);
+    el('text', { x: b.x + 28, y: b.y + 27, class: 'title' }, g).textContent = n.t;
+    el('text', { x: b.x + 16, y: b.y + 46, class: 'sub' }, g).textContent = n.s;
+  }
+  nodeEls[id] = g;
+}
+el('text', { x: 800, y: 680, class: 'group-label' }, nodesG).textContent = 'Workers';
+el('text', { x: 1010, y: 680, class: 'group-label' }, nodesG).textContent = 'Storage & outside';
+
+// A curved wire from the side of one box that faces the other.
+function wirePath(a, b) {
+  const A = box(a), B = box(b);
+  const ac = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, bc = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
+  let p1, p2;
+  if (Math.abs(bc.x - ac.x) < 40) {          // same column: leave from the right side and loop round
+    p1 = { x: A.x + A.w, y: ac.y }; p2 = { x: B.x + B.w, y: bc.y };
+    const bulge = Math.max(p1.x, p2.x) + 60;
+    return `M${p1.x},${p1.y} C${bulge},${p1.y} ${bulge},${p2.y} ${p2.x},${p2.y}`;
+  }
+  const right = bc.x > ac.x;
+  // the rail is tall: meet it at the height of the other box
+  const ay = NODES[a].rail ? Math.min(Math.max(bc.y, A.y + 30), A.y + A.h - 30) : ac.y;
+  const by = NODES[b].rail ? Math.min(Math.max(ac.y, B.y + 30), B.y + B.h - 30) : bc.y;
+  p1 = { x: right ? A.x + A.w : A.x, y: ay };
+  p2 = { x: right ? B.x : B.x + B.w, y: by };
+  const dx = Math.max(50, Math.abs(p2.x - p1.x) * 0.45) * (right ? 1 : -1);
+  return `M${p1.x},${p1.y} C${p1.x + dx},${p1.y} ${p2.x - dx},${p2.y} ${p2.x},${p2.y}`;
+}
+
+// ---------- the stories ----------
+const STORIES = [
+  { id: 'push', title: 'You push new code', steps: [
+    ['github', 'api', 'You upload new code to GitHub. GitHub <b>taps Bento on the shoulder</b> (a webhook), signed so Bento knows it really came from GitHub.'],
+    ['api', 'redis', 'The head waiter writes a <b>"check this repo"</b> slip and puts it on the order rail, in the <b>scan.jobs</b> line.'],
+    ['redis', 'scanner', 'The <b>Scanner</b> picks up the slip. If it crashed halfway, another scanner would pick the slip up again.'],
+    ['scanner', 'github', 'It downloads your code into a sealed sandbox and <b>reads it, never runs it</b>: secrets, libraries with security holes, old libraries, Docker settings, the basics.'],
+    ['scanner', 'postgres', 'It saves what it found and works out the new <b>report card and score</b>. Secret values are never saved, only where they are.'],
+    ['scanner', 'redis', 'Then it puts an <b>"advice please"</b> slip on the rail.'],
+    ['redis', 'advisor', '<b>Pickle</b> picks it up and uses fixed rules to choose the 3 things that matter most.'],
+    ['advisor', 'ollama', 'Pickle asks the <b>small AI model running on Bento\'s own server</b> to explain them in simple words. Your code never goes to an outside AI service.'],
+    ['advisor', 'postgres', 'Pickle saves its top 3. Next time you open your dashboard, it\'s there.'],
+  ]},
+  { id: 'site', title: 'Bento checks your website', steps: [
+    ['scheduler', 'redis', 'Every minute, the <b>Scheduler</b> puts a <b>"visit this site"</b> slip on the rail for each website.'],
+    ['redis', 'probers', 'The <b>Probers</b> pick them up. There can be several working at once, so many sites get checked quickly.'],
+    ['probers', 'sites', 'A prober <b>visits your site</b> and times how long it takes. It refuses private or internal addresses.'],
+    ['probers', 'redis', 'It puts the result (fast or slow, OK or failing) back on the rail.'],
+    ['redis', 'analyzer', 'The <b>Analyzer</b> compares it with what\'s normal for <i>your</i> site, which it learns over time.'],
+    ['analyzer', 'timescale', 'Every visit is saved in <b>TimescaleDB</b>, which is made for "things over time", for your uptime and speed charts.'],
+    ['analyzer', 'redis', 'If the site fails or is much slower than normal <b>3 times in a row</b>, it opens an incident and puts an <b>alert</b> slip on the rail.'],
+    ['redis', 'notifier', 'The <b>Notifier</b> picks it up. It sends only <b>one alert per problem</b>, not one every minute.'],
+    ['notifier', 'gmail', 'It emails you: <b>"Your site is failing for visitors"</b>. When the site recovers, you get a "fixed" email too.'],
+    ['notifier', 'postgres', 'And it saves a notification, so you see it on your dashboard as well.'],
+  ]},
+  { id: 'signin', title: 'Signing in with GitHub', steps: [
+    ['you', 'caddy', 'You open Bento. <b>Caddy</b>, the front door, makes the connection secure (the 🔒).'],
+    ['caddy', 'frontend', 'The <b>Frontend</b> sends you the login page with the half-open bento box.'],
+    ['you', 'github', 'You click <b>Continue with GitHub</b>. GitHub asks: "Do you allow Bento to know who you are?"'],
+    ['github', 'api', 'You say yes. GitHub sends you back to Bento with a <b>one-time code</b>.'],
+    ['api', 'github', 'Bento swaps the code for <b>who you are</b> and <b>which repos you allowed</b>. You only ever see repos you can open yourself.'],
+    ['api', 'postgres', 'Bento saves your account. It never sees your GitHub password.'],
+    ['api', 'caddy', 'Bento gives your browser a <b>signed pass</b> (like an event wristband) that lasts a week…'],
+    ['caddy', 'you', '…and you\'re in. Your dashboard opens.'],
+  ]},
+  { id: 'fix', title: '"Fix it for me"', steps: [
+    ['you', 'caddy', 'On a problem like "a library has a security hole", you click <b>Fix it</b>.'],
+    ['caddy', 'api', 'The request reaches the head waiter, which checks it\'s really your project.'],
+    ['api', 'redis', 'It puts a <b>"fix this"</b> slip on the rail, in the <b>fix.jobs</b> line.'],
+    ['redis', 'fixer', 'The <b>Fixer</b> picks it up and works out the smallest safe change.'],
+    ['fixer', 'github', 'It makes a <b>new branch</b> (a safe copy) called <b>bento/fix-…</b>, puts the fix there and opens a <b>pull request</b>: "here\'s a suggested change, please review it".'],
+    ['fixer', 'postgres', 'It remembers the pull request, so you never get two for the same problem.'],
+    ['github', 'api', 'Bento <b>never merges by itself</b>. When <i>you</i> press Merge, GitHub tells Bento, and the next check marks the problem as fixed.'],
+  ]},
+  { id: 'welcome', title: 'The welcome email', steps: [
+    ['notifier', 'postgres', 'Every minute, the <b>Notifier</b> looks for new people whose projects have just been checked.'],
+    ['postgres', 'notifier', 'It finds one and <b>marks them as done first</b>, so the email can never go out twice, even after a restart.'],
+    ['notifier', 'gmail', 'It builds their first report (score, grade per project, Pickle\'s top 3, what Bento found) and hands it to <b>Gmail</b>.'],
+    ['gmail', 'you', 'It lands in <b>that person\'s own inbox</b>, the email they signed up with or their main GitHub email. One-click unsubscribe included.'],
+  ]},
+];
+
+// ---------- playback ----------
+const wiresG = document.getElementById('wires');
+const packet = document.getElementById('packet');
+const $ = (id) => document.getElementById(id);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let story = STORIES[0], step = 0, playing = true, timer = null, anim = null, wires = [];
+
+const storiesBar = document.querySelector('.stories');
+for (const s of STORIES) {
+  const b = document.createElement('button');
+  b.textContent = s.title;
+  b.onclick = () => choose(s.id);
+  b.dataset.id = s.id;
+  storiesBar.appendChild(b);
+}
+
+function drawWires() {
+  wiresG.innerHTML = '';
+  const seen = new Set();
+  wires = story.steps.map(([a, b]) => {
+    const key = [a, b].sort().join('|');
+    const p = el('path', { d: wirePath(a, b), class: 'wire' }, wiresG);
+    if (seen.has(key)) p.style.opacity = 0; // the same pair drawn once; the packet still uses its own path
+    seen.add(key);
+    return p;
+  });
+}
+
+function show(i) {
+  cancelAnimationFrame(anim); clearTimeout(timer);
+  step = (i + story.steps.length) % story.steps.length;
+  const [a, b, text] = story.steps[step];
+  const involved = new Set(story.steps.flatMap(([x, y]) => [x, y]));
+  for (const [id, g] of Object.entries(nodeEls)) {
+    g.classList.toggle('on', id === a || id === b);
+    g.classList.toggle('dim', !involved.has(id));
+  }
+  wires.forEach((w, k) => w.classList.toggle('on', k === step));
+  $('count').textContent = `Step ${step + 1} of ${story.steps.length}`;
+  $('caption').innerHTML = text;
+  [...$('steps').children].forEach((li, k) => { li.className = k < step ? 'done' : k === step ? 'now' : ''; });
+
+  const path = wires[step], len = path.getTotalLength();
+  const travel = reduced ? 0 : 1300;
+  const start = performance.now();
+  const tick = (now) => {
+    const t = travel ? Math.min(1, (now - start) / travel) : 1;
+    const e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const pt = path.getPointAtLength(e * len);
+    packet.setAttribute('cx', pt.x); packet.setAttribute('cy', pt.y);
+    if (t < 1) anim = requestAnimationFrame(tick);
+    else if (playing) timer = setTimeout(() => show(step + 1), 2600);
+  };
+  anim = requestAnimationFrame(tick);
+}
+
+function choose(id) {
+  story = STORIES.find((s) => s.id === id);
+  document.querySelectorAll('.stories button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === id)));
+  $('story-title').textContent = story.title;
+  $('steps').innerHTML = '';
+  story.steps.forEach(([, , text], k) => {
+    const li = document.createElement('li');
+    li.textContent = text.replace(/<[^>]+>/g, '').split(/[.:](?:\s|$)/)[0];
+    li.onclick = () => show(k);
+    $('steps').appendChild(li);
+  });
+  drawWires();
+  show(0);
+}
+
+$('prev').onclick = () => show(step - 1);
+$('next').onclick = () => show(step + 1);
+$('play').onclick = () => {
+  playing = !playing;
+  $('play').textContent = playing ? 'Pause' : 'Play';
+  if (playing) show(step + 1); else clearTimeout(timer);
+};
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') show(step + 1);
+  if (e.key === 'ArrowLeft') show(step - 1);
+  if (e.key === ' ') { e.preventDefault(); $('play').click(); }
+});
+choose('push');
+</script>
+</body>
+</html>
