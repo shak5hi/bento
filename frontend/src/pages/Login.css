@@ -194,25 +194,13 @@
   padding: clamp(28px, 4vw, 56px);
 }
 
-.auth-collage {
+.auth-stage {
   position: relative;
   flex: 1;
   min-height: 360px;
-  animation: drift 14s ease-in-out infinite alternate;
+  margin: 0 calc(-1 * clamp(28px, 4vw, 56px));
 }
-
-@keyframes drift {
-  from { transform: translateY(0); }
-  to { transform: translateY(-12px); }
-}
-
-.auth .collage-img {
-  position: absolute;
-  filter: drop-shadow(0 24px 32px rgba(70, 20, 0, 0.28));
-}
-.c1 { width: 46%; top: 8%; left: 4%; transform: rotate(-9deg); }
-.c2 { width: 50%; top: 4%; right: 2%; transform: rotate(10deg); }
-.c3 { width: 56%; bottom: 4%; left: 22%; transform: rotate(-2deg); }
+.auth-canvas { position: absolute !important; inset: 0; }
 
 .auth-quote {
   margin: 0;

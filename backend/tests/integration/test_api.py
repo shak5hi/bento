@@ -359,6 +359,42 @@ def test_weekly_digest_is_sent_once_per_week(client, user, db, monkeypatch):
     assert db(run, datetime(2026, 12, 7, 9, 0, tzinfo=timezone.utc)) == 0  # switched off
 
 
+def test_new_account_gets_a_welcome_report_once_its_projects_are_scanned(client, user, db, monkeypatch):
+    from uuid import UUID
+
+    from bento_core import mail
+    from bento_core.config import settings
+    from helpers import load_service
+
+    notifier = load_service("notifier")
+    headers, me = user()
+    p = create(client, headers, name="Shop", repo_url="https://github.com/acme/shop")
+    db(seed_scores, UUID(p["id"]), 72, [("high", "Leaked key")])
+    outbox = []
+
+    async def fake_send(http, to, subject, html_body, text, unsubscribe):
+        outbox.append({"to": to, "subject": subject, "html": html_body})
+        return True
+
+    monkeypatch.setattr(mail, "send", fake_send)
+    monkeypatch.setattr(settings, "resend_api_key", "resend-key-for-tests")
+
+    async def run(state):
+        return await notifier.Notifier(state.pg, state.redis, None, state.ts).send_welcomes()
+
+    assert db(run) == 0  # the repo hasn't been scanned yet
+
+    async def scanned(state):
+        await state.pg.execute("UPDATE projects SET last_scan_at = now() - interval '2 minutes' WHERE id = $1", UUID(p["id"]))
+
+    db(scanned)
+    assert db(run) == 1
+    assert db(run) == 0  # only ever once
+    (msg,) = outbox
+    assert msg["to"] == me["email"] and msg["subject"] == "Welcome to Bento: your portfolio health is 72"
+    assert "Leaked key" in msg["html"] and "What Bento found" in msg["html"]
+
+
 # ---------- Pickle (advisor) with a mocked local model ----------
 
 def test_pickle_uses_the_model_and_falls_back_to_rules(client, user, db):

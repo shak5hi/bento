@@ -44,7 +44,8 @@ const bump = (t: number, a: number, b: number) => {
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
 
-export function BentoModel() {
+/** `ajar` poses the lid half open (login page) instead of following the landing page's scroll. */
+export function BentoModel({ ajar = false }: { ajar?: boolean } = {}) {
   const { scene } = useGLTF('/models/bento.glb');
   const logoTexture = useTexture(logoSrc);
   const lidRef = useRef<THREE.Object3D | null>(null);
@@ -96,9 +97,17 @@ export function BentoModel() {
     });
   }, [tray]);
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     const lidObj = lidRef.current;
     if (!lidObj) return;
+    if (ajar) {
+      // hinged up on the far-left edge, breathing a little so it feels alive
+      const breathe = Math.sin(clock.elapsedTime * 0.9) * 0.025;
+      lidObj.position.set(0.55, LID_REST_Y + 0.85 + breathe, 0.05);
+      _e.set(0.06, -0.1, -0.55 - breathe, 'YXZ');
+      lidObj.quaternion.copy(_q.setFromEuler(_e));
+      return;
+    }
     const p = clamp01(heroScroll.rawProgress);
     const t = smootherstep(p);
 
@@ -127,7 +136,11 @@ export function BentoModel() {
           </mesh>,
           lid,
         )}
-      <ContactShadows position={[1.4, TABLE_Y - 0.002, 0]} width={13} height={8} scale={[13, 8]} resolution={512} blur={2.6} opacity={0.5} far={2.2} color="#3a0f00" />
+      {ajar ? (
+        <ContactShadows position={[0, TABLE_Y - 0.002, 0]} scale={4.6} resolution={512} blur={3} opacity={0.35} far={0.8} color="#3a0f00" />
+      ) : (
+        <ContactShadows position={[1.4, TABLE_Y - 0.002, 0]} width={13} height={8} scale={[13, 8]} resolution={512} blur={2.6} opacity={0.5} far={2.2} color="#3a0f00" />
+      )}
     </group>
   );
 }
