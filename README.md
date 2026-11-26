@@ -13,6 +13,10 @@
 [![TimescaleDB](https://img.shields.io/badge/TimescaleDB-Postgres-fdb515?style=flat-square&logo=postgresql&logoColor=white)](https://www.timescale.com)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
+### **[Try it live → bento.104-43-56-1.sslip.io](https://bento.104-43-56-1.sslip.io)**
+
+[How Bento works, in plain words](docs/how-bento-works.md) · [Animated system design](docs/system-design.html) · [Deploy your own](deploy/README.md)
+
 </div>
 
 ---
@@ -26,6 +30,10 @@ three things to do today, not fifty alerts.
 
 ## How it works
 
+> New to all this? Read **[Bento, explained simply](docs/how-bento-works.md)**: every feature in everyday
+> words, no programming knowledge needed. To watch requests travel through the system, download
+> [`docs/system-design.html`](docs/system-design.html) and open it in your browser.
+
 ```
 CODE PIPELINE
   GitHub push ─┐
@@ -35,7 +43,7 @@ CODE PIPELINE
 
 PROBE PIPELINE
   scheduler ──► probe.jobs ──► probers ×N ──► probe.results ──► analyzer ──► incidents ──► notifier
-  Redis ZSET                   HTTP checks                      EWMA          health score   in-app / Slack
+  Redis ZSET                   HTTP checks                      EWMA          health score   in-app / email / Slack
 ```
 
 1. **Connect.** Sign in with GitHub and pick repositories (private ones too). A repo's *Website* is monitored automatically.
@@ -47,7 +55,10 @@ PROBE PIPELINE
 4. **Grade.** Four report cards (**Security**, **Website**, **Code basics** and **Upkeep**) roll up into one
    0–100 score and an A–F grade. A leaked secret caps the grade, anything not measured says so, and every
    project shows the one fix that would raise its score most.
-5. **Explain.** Pickle's rules rank incidents and findings and pick the top three; a small open AI model
+5. **Tell you.** Incident emails, a welcome report as soon as a new account's projects are scanned, and a
+   Monday summary. Sent free through a Gmail account (or Resend), always to the person's own address, with
+   one-click unsubscribe.
+6. **Explain.** Pickle's rules rank incidents and findings and pick the top three; a small open AI model
    running on your own machine (Ollama) explains them in plain words, with step-by-step fixes. No hosted AI
    service, nothing leaves the machine, and the rule-based text is used whenever the model isn't available.
 
@@ -90,6 +101,8 @@ bento/
 ├── frontend/              React 19 + Vite + TypeScript: 3D landing, login, dashboard
 ├── cli/                   `bento scan`: the scanner's checks on the command line (pip install ./cli)
 ├── action.yml             GitHub Action that runs `bento scan`
+├── docs/                  plain-language guide + animated system design (system-design.html)
+├── deploy/                server setup and the deployment walkthrough
 ├── backend/
 │   ├── docker-compose.yml the whole stack (14 containers)
 │   ├── services/
@@ -97,7 +110,7 @@ bento/
 │   │   ├── scheduler/     probe schedule (Redis ZSET, jittered)
 │   │   ├── prober/        HTTP checks, SSRF-safe
 │   │   ├── analyzer/      EWMA anomaly detection, incidents, health scores
-│   │   ├── notifier/      alerts with dedup and cooldown
+│   │   ├── notifier/      alerts, welcome report and weekly digest emails
 │   │   ├── scanner/       sandboxed repository scans
 │   │   ├── advisor/       Pickle: rules decide, a local open model explains
 │   │   └── fixer/         auto-fix pull requests (never touches the default branch)
@@ -126,11 +139,11 @@ private repositories, create a GitHub App: see [Connect GitHub](backend/README.m
 - [x] Pull request checks
 - [x] Auto-fix pull requests (always waiting for human approval)
 - [x] Public status pages and README badges
-- [x] Email alerts and a weekly digest
+- [x] Email alerts, a welcome report and a weekly digest (free through Gmail)
 - [x] Deeper scanning: secrets in code, outdated dependencies, Dockerfiles
 - [x] `bento` CLI and GitHub Action
 - [x] Test suite and CI
-- [ ] Hosted deployment
+- [x] Hosted deployment: [bento.104-43-56-1.sslip.io](https://bento.104-43-56-1.sslip.io) (Azure, Caddy HTTPS, daily backups)
 
 ## License
 
