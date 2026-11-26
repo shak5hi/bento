@@ -184,6 +184,13 @@ CREATE INDEX IF NOT EXISTS score_events_project_idx ON score_events (project_id,
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_incidents BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_digest BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_week TEXT;
+
+-- GitHub: an installation on someone else's account (a collaborator's, an org's) only exposes the repos
+-- this user can open themselves. own = the installation is on the user's own GitHub account.
+ALTER TABLE github_installations ADD COLUMN IF NOT EXISTS own BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE github_installations ADD COLUMN IF NOT EXISTS repos TEXT[] NOT NULL DEFAULT '{}';
+UPDATE github_installations i SET own = true FROM users u
+ WHERE u.id = i.owner_id AND NOT i.own AND lower(u.github_login) = lower(i.account_login);
 """
 
 TIMESCALE = """

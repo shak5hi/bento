@@ -72,17 +72,41 @@ def _back(path: str, **params: str) -> RedirectResponse:
     return RedirectResponse(f"{settings.public_url}{path}{query}", status_code=302)
 
 
-async def _sync_installations(user_id: UUID, user_token: str) -> int:
-    """Record every Bento app installation this GitHub user can access."""
+async def _sync_installations(user_id: UUID, user_token: str, github_id: int) -> int:
+    """Record the Bento app installations this GitHub user can use, and what they may see in each.
+
+    GitHub also lists installations on other people's accounts when this user collaborates on one of their
+    repos. Those must not expose the owner's other repos, so for them we keep only the repos this user can
+    open themselves (asked with the user's own token).
+    """
     data = await github.user_get("/user/installations?per_page=100", user_token, state.http)
-    found = data.get("installations", [])
+    found = []
+    for inst in data.get("installations", []):
+        own = inst["account"].get("id") == github_id
+        repos: list[str] = []
+        if not own:
+            try:
+                for page in range(1, 11):
+                    res = await github.user_get(
+                        f"/user/installations/{inst['id']}/repositories?per_page=100&page={page}", user_token, state.http
+                    )
+                    batch = res.get("repositories", [])
+                    repos += [r["full_name"].lower() for r in batch]
+                    if len(batch) < 100:
+                        break
+            except github.GitHubError as exc:
+                log.warning("installation %s: can't list this user's repos: %s", inst["id"], exc)
+                continue
+            if not repos:
+                continue
+        found.append((inst, own, repos))
     async with state.pg.acquire() as conn, conn.transaction():
         await conn.execute("DELETE FROM github_installations WHERE owner_id = $1", user_id)
-        for inst in found:
+        for inst, own, repos in found:
             await conn.execute(
-                """INSERT INTO github_installations (id, owner_id, account_login, account_type)
-                   VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING""",
-                inst["id"], user_id, inst["account"]["login"], inst["account"].get("type"),
+                """INSERT INTO github_installations (id, owner_id, account_login, account_type, own, repos)
+                   VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING""",
+                inst["id"], user_id, inst["account"]["login"], inst["account"].get("type"), own, repos,
             )
     return len(found)
 
@@ -119,7 +143,8 @@ async def _user_for_login(profile: dict, emails: list[dict]) -> tuple[UUID, str]
 
 async def _installation_repos(user_id: UUID) -> list[dict]:
     installs = await state.pg.fetch(
-        "SELECT id, account_login FROM github_installations WHERE owner_id = $1 ORDER BY account_login", user_id
+        "SELECT id, account_login, own, repos FROM github_installations WHERE owner_id = $1 ORDER BY account_login",
+        user_id,
     )
     repos: list[dict] = []
     for inst in installs:
@@ -137,6 +162,8 @@ async def _installation_repos(user_id: UUID) -> list[dict]:
                 break
             batch = res.json().get("repositories", [])
             for r in batch:
+                if not inst["own"] and r["full_name"].lower() not in inst["repos"]:
+                    continue  # someone else's repo this user can't open themselves
                 repos.append({
                     "installationId": inst["id"],
                     "fullName": r["full_name"],
@@ -181,10 +208,15 @@ async def github_callback(request: Request):
     if q.get("error"):
         return _back("/login", error="GitHub sign-in was cancelled.")
     _require_github()
-    try:
-        st = await _read_state(q.get("state"))
-    except HTTPException as exc:
-        return _back("/login", error=exc.detail)
+    if not q.get("state") and q.get("setup_action") and q.get("code"):
+        # Installed (or its repo access changed) straight from GitHub's app page: GitHub calls back with
+        # an authorization code but no state of ours. The code itself proves who the user is: sign them in.
+        st: dict = {"i": "login"}
+    else:
+        try:
+            st = await _read_state(q.get("state"))
+        except HTTPException as exc:
+            return _back("/login", error=exc.detail)
     if not q.get("code"):
         # App installed without the OAuth step: ask GitHub to authorize, which brings us back with a code.
         return _back("/dashboard", github="installed")
@@ -207,7 +239,7 @@ async def github_callback(request: Request):
         await state.pg.execute(
             "UPDATE users SET github_id = $2, github_login = $3 WHERE id = $1", user_id, profile["id"], profile["login"]
         )
-        count = await _sync_installations(user_id, user_token)
+        count = await _sync_installations(user_id, user_token, profile["id"])
         log.info("user %s linked github %s (%d installations)", user_id, profile["login"], count)
         return _back("/dashboard", github="connected")
 
@@ -215,7 +247,7 @@ async def github_callback(request: Request):
         user_id, email = await _user_for_login(profile, emails)
     except HTTPException as exc:
         return _back("/login", error=exc.detail)
-    await _sync_installations(user_id, user_token)
+    await _sync_installations(user_id, user_token, profile["id"])
     # The token travels in the URL fragment, which browsers never send to a server.
     return RedirectResponse(f"{settings.public_url}/auth/callback#token={issue_token(user_id, email)}", status_code=302)
 
