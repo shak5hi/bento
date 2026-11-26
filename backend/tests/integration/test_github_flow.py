@@ -130,6 +130,15 @@ def test_bad_callbacks_go_back_to_login(client, fake_github, params):
     assert res.status_code == 302 and path == "/login" and query["error"]
 
 
+def test_placeholder_email_is_replaced_once_github_shares_the_real_one(client, fake_github):
+    fake_github.emails = []  # GitHub didn't share emails the first time
+    headers = _sign_in(client)
+    assert client.get("/api/auth/me", headers=headers).json()["user"]["email"].endswith("@users.noreply.github.com")
+    fake_github.emails = [{"email": "octo@example.com", "primary": True, "verified": True}]
+    headers = _sign_in(client)
+    assert client.get("/api/auth/me", headers=headers).json()["user"]["email"] == "octo@example.com"
+
+
 def _sign_in(client) -> dict:
     state = parse_qs(urlsplit(client.get("/api/auth/github/login", follow_redirects=False).headers["location"]).query)["state"][0]
     cb = client.get("/api/auth/github/callback", params={"code": "abc", "state": state}, follow_redirects=False)
