@@ -114,13 +114,23 @@ async def _sync_installations(user_id: UUID, user_token: str, github_id: int) ->
 async def _user_for_login(profile: dict, emails: list[dict]) -> tuple[UUID, str]:
     """Find the Bento account for this GitHub user, linking by verified email or creating one."""
     gh_id, login = profile["id"], profile["login"]
-    row = await state.pg.fetchrow("SELECT id, email FROM users WHERE github_id = $1", gh_id)
-    if row:
-        await state.pg.execute("UPDATE users SET github_login = $2 WHERE id = $1", row["id"], login)
-        return row["id"], row["email"]
-
     verified = [e["email"].lower() for e in emails if e.get("verified")]
     primary = next((e["email"].lower() for e in emails if e.get("primary") and e.get("verified")), None)
+
+    row = await state.pg.fetchrow("SELECT id, email FROM users WHERE github_id = $1", gh_id)
+    if row:
+        email = row["email"]
+        # Signed up before GitHub shared their email (placeholder address): use the real one now, so
+        # their emails can reach them. Skipped if another account already uses that address.
+        if email.endswith("@users.noreply.github.com") and primary:
+            updated = await state.pg.fetchval(
+                """UPDATE users SET email = $2 WHERE id = $1
+                    AND NOT EXISTS (SELECT 1 FROM users WHERE email = $2) RETURNING email""",
+                row["id"], primary,
+            )
+            email = updated or email
+        await state.pg.execute("UPDATE users SET github_login = $2 WHERE id = $1", row["id"], login)
+        return row["id"], email
     if verified:
         row = await state.pg.fetchrow(
             "UPDATE users SET github_id = $2, github_login = $3 WHERE email = ANY($1::text[]) AND github_id IS NULL "
