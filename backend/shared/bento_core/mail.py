@@ -127,11 +127,16 @@ def incident_email(project: str, title: str, detail: str, opened: bool, unsubscr
     return subject, _layout(e(title), body, unsubscribe, KINDS["incidents"]), text
 
 
-def digest_email(d: dict, unsubscribe: str) -> tuple[str, str, str]:
-    """(subject, html, text) for the weekly digest. d: health, change, projects, new, resolved, top."""
+def digest_email(d: dict, unsubscribe: str, welcome: bool = False) -> tuple[str, str, str]:
+    """(subject, html, text) for the weekly digest. d: health, change, projects, new, resolved, top.
+
+    welcome=True is a new account's first report: everything found is new, so it lists what Bento found
+    instead of a week's changes.
+    """
     health, change = d.get("health"), d.get("change")
-    trend = "" if change in (None, 0) else (f" (▲ {change} this week)" if change > 0 else f" (▼ {-change} this week)")
-    subject = f"Your week in Bento: health {health if health is not None else '—'}{trend}"
+    trend = "" if welcome or change in (None, 0) else (f" (▲ {change} this week)" if change > 0 else f" (▼ {-change} this week)")
+    subject = (f"Welcome to Bento: your portfolio health is {health if health is not None else '—'}" if welcome
+               else f"Your week in Bento: health {health if health is not None else '—'}{trend}")
 
     rows = "".join(
         f'<tr><td style="padding:8px 0;border-bottom:1px solid {LINE}">{e(p["name"])}</td>'
@@ -159,15 +164,18 @@ def digest_email(d: dict, unsubscribe: str) -> tuple[str, str, str]:
         f'<p style="margin:0">Portfolio health: <strong style="font-size:20px">{health if health is not None else "—"}</strong>'
         f'<span style="color:{MUTED}">{e(trend)}</span></p>'
         + (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:14px">{rows}</table>' if rows else "")
-        + (f'<p style="margin:28px 0 4px;font-weight:600">Pickle\'s top 3 for this week</p><ol style="margin:0;padding-left:20px">{top}</ol>' if top else "")
-        + items("New this week", d.get("new", []), "No new problems. Nice.")
-        + items("Fixed this week", d.get("resolved", []), "Nothing fixed this week.")
+        + (f'<p style="margin:28px 0 4px;font-weight:600">Pickle\'s top 3 {"to start with" if welcome else "for this week"}</p>'
+           f'<ol style="margin:0;padding-left:20px">{top}</ol>' if top else "")
+        + (items("What Bento found", d.get("new", []), "No problems found. Nice.") if welcome else
+           items("New this week", d.get("new", []), "No new problems. Nice.")
+           + items("Fixed this week", d.get("resolved", []), "Nothing fixed this week."))
         + _button("Open Bento", f"{settings.public_url}/dashboard")
     )
     text_lines = [subject, ""]
     text_lines += [f"- {p['name']}: {p.get('grade') or '-'} {p.get('health') if p.get('health') is not None else ''}" for p in d.get("projects", [])]
     if d.get("top"):
         text_lines += ["", "Pickle's top 3:"] + [f"{i}. {t['title']} ({t['project']})" for i, t in enumerate(d["top"][:3], 1)]
-    text_lines += ["", f"New this week: {len(d.get('new', []))} · Fixed: {len(d.get('resolved', []))}",
+    text_lines += ["", (f"Bento found {len(d.get('new', []))} problems" if welcome else
+                        f"New this week: {len(d.get('new', []))} · Fixed: {len(d.get('resolved', []))}"),
                    f"Open Bento: {settings.public_url}/dashboard", f"Unsubscribe: {unsubscribe}"]
     return subject, _layout("Your week in Bento", body, unsubscribe, KINDS["digest"]), "\n".join(text_lines)

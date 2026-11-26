@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, api, auth } from '../lib/api';
 import { RiceBallInline } from '../components/RiceBall';
 import logoSrc from '../assets/logo.png';
 import './Login.css';
 
-import zoom1Img from '../assets/compartmentzoom1.svg';
-import zoom2Img from '../assets/compartmentzoom2.svg';
-import zoom4Img from '../assets/compartmentzoom4.svg';
+// three.js only loads on wide screens, where the art panel is shown
+const LoginBento = lazy(() => import('../experience/LoginBento'));
+const wide = typeof window !== 'undefined' && window.matchMedia('(min-width: 901px)').matches;
 
 type Mode = 'login' | 'register';
 
@@ -135,10 +135,8 @@ export default function Login() {
       </section>
 
       <aside className="auth-art" aria-hidden="true">
-        <div className="auth-collage">
-          <img src={zoom1Img} className="collage-img c1" alt="" />
-          <img src={zoom2Img} className="collage-img c2" alt="" />
-          <img src={zoom4Img} className="collage-img c3" alt="" />
+        <div className="auth-stage">
+          {wide && <Suspense fallback={null}><LoginBento /></Suspense>}
         </div>
         <figure className="auth-quote">
           <blockquote>“Open one place. Know exactly what to do next.”</blockquote>

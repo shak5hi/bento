@@ -189,6 +189,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_week TEXT;
 -- this user can open themselves. own = the installation is on the user's own GitHub account.
 ALTER TABLE github_installations ADD COLUMN IF NOT EXISTS own BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE github_installations ADD COLUMN IF NOT EXISTS repos TEXT[] NOT NULL DEFAULT '{}';
+-- Welcome email: new accounts get their first portfolio report once their projects are scanned.
+-- Added as false (existing accounts never get one), then defaulted to true for every account made after.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS welcome_due BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ALTER COLUMN welcome_due SET DEFAULT true;
 UPDATE github_installations i SET own = true FROM users u
  WHERE u.id = i.owner_id AND NOT i.own AND lower(u.github_login) = lower(i.account_login);
 """

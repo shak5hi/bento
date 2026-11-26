@@ -5,6 +5,9 @@ sends the first one and suppresses repeats for a 30-minute cooldown, so one inci
 (and at most one email). Every Monday morning (DIGEST_TIMEZONE / DIGEST_HOUR) each user with the
 digest switched on gets one summary email; a user's week is claimed in the database first, so
 restarts or several notifier replicas never send it twice.
+
+New accounts get a welcome email with their first portfolio report as soon as the projects they added
+have been scanned (or after 15 minutes, whichever is first); claimed in the database the same way.
 """
 
 import asyncio
@@ -21,6 +24,7 @@ from bento_core.log import setup_logging
 log = setup_logging()
 COOLDOWN_S = 1800
 DIGEST_CHECK_S = 600
+WELCOME_CHECK_S = 60
 
 
 def _describe(a: dict) -> tuple[str, str]:
@@ -118,6 +122,50 @@ class Notifier:
         return sent
 
 
+    async def welcome_loop(self) -> None:
+        while True:
+            try:
+                await self.send_welcomes()
+            except Exception:  # noqa: BLE001
+                log.exception("welcome emails failed")
+            await asyncio.sleep(WELCOME_CHECK_S)
+
+    async def send_welcomes(self) -> int:
+        """First portfolio report for new accounts, once their projects are scanned. Never sent twice."""
+        if not mail.configured():
+            return 0
+        # Ready: has projects, every repo has had its first scan (plus a minute for Pickle's advice),
+        # or the first project was added 15+ minutes ago (a repo that can't be scanned shouldn't block it).
+        users = await self.pg.fetch(
+            """SELECT u.id, u.email FROM users u
+                WHERE u.welcome_due AND u.email_digest
+                  AND EXISTS (SELECT 1 FROM projects p WHERE p.owner_id = u.id)
+                  AND (
+                    (SELECT min(created_at) FROM projects p WHERE p.owner_id = u.id) < now() - interval '15 minutes'
+                    OR (NOT EXISTS (SELECT 1 FROM projects p WHERE p.owner_id = u.id
+                                     AND p.repo_url IS NOT NULL AND p.last_scan_at IS NULL)
+                        AND COALESCE((SELECT max(last_scan_at) FROM projects p WHERE p.owner_id = u.id),
+                                     (SELECT max(created_at) FROM projects p WHERE p.owner_id = u.id))
+                            < now() - interval '1 minute'))"""
+        )
+        sent = 0
+        for u in users:
+            claimed = await self.pg.fetchval(
+                "UPDATE users SET welcome_due = false WHERE id = $1 AND welcome_due RETURNING id", u["id"]
+            )
+            if not claimed or not mail.deliverable(u["email"]):
+                continue
+            content = await digest.build(self.pg, self.ts, u["id"])
+            if content is None:
+                continue
+            unsubscribe = mail.unsubscribe_url(u["id"], "digest")
+            subject, html_body, text = mail.digest_email(content, unsubscribe, welcome=True)
+            ok = await mail.send(self.http, u["email"], subject, html_body, text, unsubscribe)
+            sent += ok
+            log.info("welcome email for %s: %s", u["id"], "sent" if ok else "not sent")
+        return sent
+
+
 async def main() -> None:
     pg = await create_pool(settings.database_url)
     ts = await create_pool(settings.timescale_url)
@@ -125,6 +173,7 @@ async def main() -> None:
     async with httpx.AsyncClient(timeout=10) as http:
         notifier = Notifier(pg, r, http, ts)
         asyncio.create_task(notifier.digest_loop())
+        asyncio.create_task(notifier.welcome_loop())
         await streams.consume(r, streams.ALERTS, "notifier", notifier.handle, count=50)
 
 
