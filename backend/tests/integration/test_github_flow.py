@@ -27,7 +27,8 @@ class FakeGitHub:
     def __init__(self):
         self.profile = {"id": 4242, "login": "octo", "name": "Octo Cat"}
         self.emails = [{"email": "octo@example.com", "primary": True, "verified": True}]
-        self.installations = [{"id": 99, "account": {"login": "Acme", "type": "Organization"}}]
+        self.installations = [{"id": 99, "account": {"id": 7, "login": "Acme", "type": "Organization"}}]
+        self.user_repos = REPOS  # what this user can open themselves in installation 99
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -39,6 +40,8 @@ class FakeGitHub:
             return httpx.Response(200, json=self.emails)
         if path == "/user/installations":
             return httpx.Response(200, json={"installations": self.installations})
+        if path == "/user/installations/99/repositories":
+            return httpx.Response(200, json={"repositories": self.user_repos})
         if path == "/installation/repositories":
             return httpx.Response(200, json={"repositories": REPOS})
         return httpx.Response(404, json={"message": "Not Found"})
@@ -127,13 +130,47 @@ def test_bad_callbacks_go_back_to_login(client, fake_github, params):
     assert res.status_code == 302 and path == "/login" and query["error"]
 
 
+def _sign_in(client) -> dict:
+    state = parse_qs(urlsplit(client.get("/api/auth/github/login", follow_redirects=False).headers["location"]).query)["state"][0]
+    cb = client.get("/api/auth/github/callback", params={"code": "abc", "state": state}, follow_redirects=False)
+    return {"Authorization": f"Bearer {location(cb)[1]['#'].removeprefix('token=')}"}
+
+
+def test_collaborator_only_sees_the_repos_they_can_open(client, fake_github):
+    # The installation belongs to someone else; this user collaborates on just one of its repos.
+    fake_github.installations = [{"id": 99, "account": {"id": 1, "login": "friend", "type": "User"}}]
+    fake_github.user_repos = [REPOS[1]]
+    headers = _sign_in(client)
+    repos = client.get("/api/github/repos", headers=headers).json()["repos"]
+    assert [r["fullName"] for r in repos] == ["Acme/Docs"]
+    res = client.post("/api/github/import", headers=headers, json={"repos": ["Acme/Shop"]})
+    assert res.status_code == 404
+
+
+def test_own_installation_shows_every_repo(client, fake_github):
+    fake_github.installations = [{"id": 99, "account": {"id": 4242, "login": "octo", "type": "User"}}]
+    fake_github.user_repos = []  # never asked: the whole installation is theirs
+    headers = _sign_in(client)
+    assert len(client.get("/api/github/repos", headers=headers).json()["repos"]) == 2
+
+
+def test_installing_from_github_without_our_state_signs_in(client, fake_github):
+    cb = client.get(
+        "/api/auth/github/callback",
+        params={"code": "abc", "installation_id": "99", "setup_action": "install"},
+        follow_redirects=False,
+    )
+    path, params = location(cb)
+    assert path == "/auth/callback" and params["#"].startswith("token=")
+
+
 def test_list_and_import_repositories(client, fake_github, user, db):
     headers, me = user()
 
     async def link(state):
         from uuid import UUID
         await state.pg.execute(
-            "INSERT INTO github_installations (id, owner_id, account_login) VALUES (99, $1, 'Acme')", UUID(me["id"])
+            "INSERT INTO github_installations (id, owner_id, account_login, own) VALUES (99, $1, 'Acme', true)", UUID(me["id"])
         )
 
     db(link)
